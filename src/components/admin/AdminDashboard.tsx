@@ -11,9 +11,11 @@ import {
   AlertCircle,
   Coins,
   ShieldCheck,
+  Landmark,
 } from 'lucide-react';
 import { AdminDashboardMetrics, AdminViewKey, SubscriptionRecord, AdminActivityLog } from '../../types';
 import { getAdminStats, getPendingPayments, getAdminActivityLogs } from '../../services/adminService';
+import { getPaymentAccountStats } from '../../services/paymentAccountService';
 
 interface AdminDashboardProps {
   onNavigate: (view: AdminViewKey) => void;
@@ -23,19 +25,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
   const [metrics, setMetrics] = useState<AdminDashboardMetrics | null>(null);
   const [pendingPayments, setPendingPayments] = useState<SubscriptionRecord[]>([]);
   const [recentLogs, setRecentLogs] = useState<AdminActivityLog[]>([]);
+  const [paymentStats, setPaymentStats] = useState<{ total: number; active: number }>({ total: 0, active: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const [stats, pending, logs] = await Promise.all([
+      const [stats, pending, logs, accStats] = await Promise.all([
         getAdminStats(),
         getPendingPayments(),
         getAdminActivityLogs(),
+        getPaymentAccountStats(),
       ]);
       setMetrics(stats);
       setPendingPayments(pending.slice(0, 5));
       setRecentLogs(logs.slice(0, 5));
+      setPaymentStats(accStats);
     } catch (err) {
       console.error('Failed to load admin dashboard data:', err);
     } finally {
@@ -214,7 +219,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
       </div>
 
       {/* Quick Action Shortcuts */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <button
           onClick={() => onNavigate('payment-verification')}
           className="p-3.5 rounded-xl bg-white border border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/50 text-left transition-all cursor-pointer shadow-xs"
@@ -227,10 +232,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         </button>
 
         <button
-          onClick={() => onNavigate('user-management')}
+          id="quick-action-payment-accounts"
+          onClick={() => onNavigate('payment-accounts')}
           className="p-3.5 rounded-xl bg-white border border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/50 text-left transition-all cursor-pointer shadow-xs"
         >
           <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-2">
+            <Landmark className="w-4 h-4" />
+          </div>
+          <div className="font-semibold text-xs text-slate-900">Rekening Bayar</div>
+          <div className="text-[11px] text-slate-500">{paymentStats.active} rekening aktif</div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('user-management')}
+          className="p-3.5 rounded-xl bg-white border border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/50 text-left transition-all cursor-pointer shadow-xs"
+        >
+          <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
             <Users className="w-4 h-4" />
           </div>
           <div className="font-semibold text-xs text-slate-900">Kelola Pengguna</div>
@@ -258,6 +275,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
           <div className="font-semibold text-xs text-slate-900">Profil Super Admin</div>
           <div className="text-[11px] text-slate-500">Status otoritas sistem</div>
         </button>
+      </div>
+
+      {/* Kartu Rekening Pembayaran (Tahap 8C) */}
+      <div
+        id="admin-dashboard-payment-accounts-card"
+        className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+            <Landmark className="w-6 h-6 text-amber-600" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3 className="font-bold text-base text-slate-900">Rekening Pembayaran</h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                DATA FIRESTORE
+              </span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Rekening bank tujuan transfer pembayaran paket Premium yang aktif ditampilkan kepada pengguna.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 sm:gap-6 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+          <div className="text-center sm:text-right">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">TOTAL REKENING</span>
+            <span className="text-xl font-black text-slate-900">{paymentStats.total}</span>
+          </div>
+          <div className="text-center sm:text-right">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">REKENING AKTIF</span>
+            <span className="text-xl font-black text-emerald-600">{paymentStats.active}</span>
+          </div>
+          <button
+            id="btn-manage-payment-accounts-dashboard"
+            onClick={() => onNavigate('payment-accounts')}
+            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+          >
+            <span>Kelola Rekening</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Two Column Section: Recent Pending Payments & Recent Logs */}

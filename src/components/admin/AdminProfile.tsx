@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Mail, User, Sparkles, Lock, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { isPrimarySuperAdmin } from '../../services/adminService';
+import { ProfilePhotoUploader } from '../ProfilePhotoUploader';
 
 interface AdminProfileProps {
   currentUser: UserProfile | null;
@@ -9,6 +10,13 @@ interface AdminProfileProps {
 
 export const AdminProfile: React.FC<AdminProfileProps> = ({ currentUser }) => {
   const isPrimary = isPrimarySuperAdmin(currentUser);
+  const [photoURL, setPhotoURL] = useState<string>(currentUser?.photoURL || '');
+
+  useEffect(() => {
+    if (currentUser?.photoURL !== undefined) {
+      setPhotoURL(currentUser.photoURL || '');
+    }
+  }, [currentUser?.photoURL]);
 
   return (
     <div id="admin-profile-root" className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">
@@ -25,26 +33,50 @@ export const AdminProfile: React.FC<AdminProfileProps> = ({ currentUser }) => {
 
       {/* Profile Card */}
       <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-6 border-b border-slate-100">
-          <div className="w-16 h-16 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold text-xl shadow-xs">
-            SA
-          </div>
+        {/* Photo Uploader Section */}
+        <div className="pb-6 border-b border-slate-100">
+          <ProfilePhotoUploader
+            currentPhotoURL={photoURL}
+            displayName={currentUser?.fullName || 'Super Administrator'}
+            isAdmin={true}
+            onPhotoUpdated={(newUrl) => {
+              setPhotoURL(newUrl);
+              if (currentUser) {
+                currentUser.photoURL = newUrl;
+              }
+            }}
+            onPhotoDeleted={() => {
+              setPhotoURL('');
+              if (currentUser) {
+                currentUser.photoURL = '';
+              }
+            }}
+          />
+        </div>
+
+        {/* Identity & Status */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-slate-900">
                 {currentUser?.fullName || 'Super Administrator'}
               </h2>
               {isPrimary && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-[11px] font-bold text-amber-900">
-                  <Sparkles className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-[11px] font-bold text-amber-900">
+                  <Sparkles className="w-3 h-3 text-amber-600" />
                   SUPER ADMIN UTAMA
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 flex items-center gap-1">
-              <Mail className="w-3.5 h-3.5" />
+            <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-slate-400" />
               <span>{currentUser?.email}</span>
             </p>
+          </div>
+
+          <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Sesi Firebase Auth Aktif</span>
           </div>
         </div>
 

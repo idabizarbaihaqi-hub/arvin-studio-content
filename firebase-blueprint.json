@@ -122,12 +122,31 @@
         "adminId": { "type": "string", "description": "UID super admin" },
         "adminEmail": { "type": "string", "description": "Email super admin" },
         "action": { "type": "string", "description": "Jenis aksi (e.g. SUPER_ADMIN_APPROVED_PAYMENT)" },
+        "targetId": { "type": "string", "description": "ID objek target jika ada" },
         "targetUserId": { "type": "string", "description": "UID user target jika ada" },
         "targetSubscriptionId": { "type": "string", "description": "ID subscription target jika ada" },
         "description": { "type": "string", "description": "Deskripsi aktivitas" },
         "createdAt": { "type": "string", "description": "Waktu aktivitas ISO" }
       },
       "required": ["id", "adminId", "action", "description", "createdAt"]
+    },
+    "PaymentAccount": {
+      "title": "PaymentAccount",
+      "description": "Rekening pembayaran resmi untuk transfer langganan di collection payment_accounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID dokumen rekening" },
+        "bankName": { "type": "string", "description": "Nama Bank (contoh: BCA, Mandiri, BRI, BNI)" },
+        "accountName": { "type": "string", "description": "Nama pemilik rekening" },
+        "accountNumber": { "type": "string", "description": "Nomor rekening bank" },
+        "description": { "type": "string", "description": "Deskripsi atau catatan rekening" },
+        "isActive": { "type": "boolean", "description": "Status keaktifan rekening" },
+        "createdAt": { "type": "string", "description": "Waktu pembuatan ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" },
+        "createdBy": { "type": "string", "description": "UID admin pembuat" },
+        "updatedBy": { "type": "string", "description": "UID admin pengubah" }
+      },
+      "required": ["id", "bankName", "accountName", "accountNumber", "isActive", "createdAt", "updatedAt", "createdBy", "updatedBy"]
     }
   },
   "firestore": {
@@ -146,6 +165,10 @@
     "/subscriptions/{subId}": {
       "schema": { "$ref": "#/entities/Subscription" },
       "description": "Pengajuan dan status langganan premium akun"
+    },
+    "/payment_accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/PaymentAccount" },
+      "description": "Daftar rekening bank pembayaran langganan resmi"
     },
     "/ai_history/{historyId}": {
       "schema": { "$ref": "#/entities/AiHistory" },

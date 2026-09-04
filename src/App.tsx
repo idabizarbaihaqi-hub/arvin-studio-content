@@ -499,6 +499,7 @@ export default function App() {
         }}
         isSuperAdmin={currentUser?.role === 'SUPER_ADMIN'}
         userName={currentUser?.fullName}
+        userPhotoURL={currentUser?.photoURL}
         onNavigateToAdmin={() => {
           setAppRoute('admin');
           window.history.pushState(null, '', '/admin');

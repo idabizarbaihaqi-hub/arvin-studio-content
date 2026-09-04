@@ -13,6 +13,7 @@ interface SidebarProps {
   isSuperAdmin?: boolean;
   onNavigateToAdmin?: () => void;
   userName?: string;
+  userPhotoURL?: string | null;
 }
 
 export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
@@ -68,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isSuperAdmin,
   onNavigateToAdmin,
   userName,
+  userPhotoURL,
 }) => {
   return (
     <>
@@ -280,9 +282,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }}
             className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl p-3 flex items-center gap-3 transition-colors text-left cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-              {userName ? userName.slice(0, 2).toUpperCase() : 'AS'}
-            </div>
+            {userPhotoURL ? (
+              <img
+                src={userPhotoURL}
+                alt={userName || 'User'}
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                {userName ? userName.slice(0, 2).toUpperCase() : 'AS'}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold truncate text-slate-900">
                 {userName || 'Kreator ARVIN'}

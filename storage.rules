@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /payment_proofs/{userId}/{subscriptionId}/{fileName} {
+      // User can write only to their own directory, size <= 5MB, allowed types
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size <= 5 * 1024 * 1024
+                   && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+      
+      // Owner or Super Admin can read the proof
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com') ||
+        request.auth.token.superAdmin == true ||
+        request.auth.token.role == 'SUPER_ADMIN'
+      );
+    }
+
+    match /profile_photos/{userId}/{fileName} {
+      // Any authenticated user can view profile photos (needed for avatars in UI)
+      allow read: if request.auth != null;
+      // User can upload/update only their own profile photo, size <= 5MB, format JPG/JPEG/PNG/WEBP
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size <= 5 * 1024 * 1024
+                   && (request.resource.contentType.matches('image/(jpeg|jpg|png|webp)'));
+      // User can delete only their own profile photo
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

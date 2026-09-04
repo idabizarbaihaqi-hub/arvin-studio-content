@@ -13,6 +13,7 @@ import {
   LogOut,
   X,
   Sparkles,
+  Landmark,
 } from 'lucide-react';
 import { AdminViewKey, UserProfile } from '../../types';
 import { AsLogo } from '../AsLogo';
@@ -54,6 +55,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           icon: CheckCircle2,
           badge: pendingCount > 0 ? pendingCount : undefined,
         },
+        { key: 'payment-accounts' as AdminViewKey, label: 'Rekening Pembayaran', icon: Landmark },
         { key: 'credit-management' as AdminViewKey, label: 'Credit Management', icon: Coins },
       ],
     },
@@ -170,9 +172,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         <div className="p-3 border-t border-slate-100 bg-slate-50/50">
           <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between mb-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300/60 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0">
-                SA
-              </div>
+              {currentUser?.photoURL ? (
+                <img
+                  src={currentUser.photoURL}
+                  alt={currentUser.fullName || 'Admin'}
+                  referrerPolicy="no-referrer"
+                  className="w-8 h-8 rounded-lg object-cover border border-amber-300/60 shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-300/60 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0">
+                  {currentUser?.fullName ? currentUser.fullName.slice(0, 2).toUpperCase() : 'SA'}
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-slate-900 truncate">
                   {currentUser?.fullName || 'Super Administrator'}

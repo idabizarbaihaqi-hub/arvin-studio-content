@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, ActiveView } from '../types';
 import { getAccountSummary, updateProfile } from '../services/accessControlService';
+import { ProfilePhotoUploader } from './ProfilePhotoUploader';
 
 interface ProfileProps {
   onBack: () => void;
@@ -157,33 +158,31 @@ export const Profile: React.FC<ProfileProps> = ({ onBack }) => {
 
         {/* Profile Card Form */}
         <form onSubmit={handleSave} className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 sm:p-8 space-y-6">
-          {/* Avatar Section */}
-          <div className="flex flex-col sm:flex-row items-center gap-5 pb-6 border-b border-slate-100">
-            <div className="relative">
-              {photoURL.trim() ? (
-                <img
-                  src={photoURL}
-                  alt={displayName || 'Avatar'}
-                  className="w-24 h-24 rounded-3xl object-cover border-2 border-slate-200 shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-3xl bg-slate-900 text-white font-bold text-3xl flex items-center justify-center shadow-md">
-                  {displayName ? displayName.charAt(0).toUpperCase() : 'A'}
-                </div>
-              )}
-            </div>
+          {/* Avatar Section (Tahap 8C) */}
+          <div className="pb-6 border-b border-slate-100">
+            <ProfilePhotoUploader
+              currentPhotoURL={photoURL}
+              displayName={displayName || user?.displayName}
+              isAdmin={user?.role === 'SUPER_ADMIN'}
+              onPhotoUpdated={(newUrl) => {
+                setPhotoURL(newUrl);
+                if (user) {
+                  setUser({ ...user, photoURL: newUrl });
+                }
+              }}
+              onPhotoDeleted={() => {
+                setPhotoURL('');
+                if (user) {
+                  setUser({ ...user, photoURL: '' });
+                }
+              }}
+            />
 
-            <div className="text-center sm:text-left space-y-1 flex-1">
-              <h2 className="font-bold text-lg text-slate-900">
-                {displayName || 'Kreator ARVIN'}
-              </h2>
+            <div className="mt-4 pt-3 border-t border-slate-100/80 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-slate-500 font-mono">
                 @{username || 'user'} • UID: <span className="text-slate-700">{user?.id?.slice(0, 10)}...</span>
               </p>
-              <div className="pt-1 flex items-center justify-center sm:justify-start gap-1.5 text-xs text-slate-500">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
                 <span>Akun Terverifikasi Firebase</span>
               </div>
@@ -246,31 +245,6 @@ export const Profile: React.FC<ProfileProps> = ({ onBack }) => {
               </div>
             </div>
           </div>
-
-          {/* Profile Photo URL (Only visible in edit mode) */}
-          {isEditing && (
-            <div>
-              <label htmlFor="input-photo-url" className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                URL Foto Profil
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Camera className="w-4 h-4" />
-                </div>
-                <input
-                  id="input-photo-url"
-                  type="url"
-                  value={photoURL}
-                  onChange={(e) => setPhotoURL(e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
-                />
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Masukkan tautan gambar publik untuk avatar profil Anda.
-              </p>
-            </div>
-          )}
 
           {/* Full Name */}
           <div>

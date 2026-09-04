@@ -21,6 +21,7 @@ import { ContentHistoryMonitoring } from './ContentHistoryMonitoring';
 import { AdminActivityLogs } from './AdminActivityLogs';
 import { AdminProfile } from './AdminProfile';
 import { SystemSettings } from './SystemSettings';
+import { PaymentAccountManagement } from './PaymentAccountManagement';
 
 interface AdminPanelProps {
   currentUser: UserProfile | null;
@@ -33,7 +34,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onLogout,
   onSwitchToUserDashboard,
 }) => {
-  const [currentView, setCurrentView] = useState<AdminViewKey>('dashboard');
+  const [currentView, setCurrentView] = useState<AdminViewKey>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/admin/payment-accounts' || path.startsWith('/admin/payment-accounts')) {
+        return 'payment-accounts';
+      }
+      const searchParams = new URLSearchParams(window.location.search);
+      const viewParam = searchParams.get('view') as AdminViewKey;
+      if (viewParam) return viewParam;
+    }
+    return 'dashboard';
+  });
   const [presetTargetUserId, setPresetTargetUserId] = useState<string | null>(null);
   const [pendingBadgeCount, setPendingBadgeCount] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -43,6 +55,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleNavigate = (view: AdminViewKey) => {
     setCurrentView(view);
     setIsMobileSidebarOpen(false);
+    if (typeof window !== 'undefined') {
+      if (view === 'dashboard') {
+        window.history.pushState(null, '', '/admin');
+      } else if (view === 'payment-accounts') {
+        window.history.pushState(null, '', '/admin/payment-accounts');
+      } else {
+        window.history.pushState(null, '', `/admin?view=${view}`);
+      }
+    }
   };
 
   const handleOpenCreditAdjustment = (userId: string) => {
@@ -96,6 +117,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           )}
 
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+            {currentUser?.photoURL ? (
+              <img
+                src={currentUser.photoURL}
+                alt={currentUser.fullName || 'Admin'}
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-xl object-cover border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300/60 text-amber-900 flex items-center justify-center font-bold text-xs shrink-0">
+                {currentUser?.fullName ? currentUser.fullName.slice(0, 2).toUpperCase() : 'SA'}
+              </div>
+            )}
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-slate-900 leading-tight">
                 {currentUser?.fullName || 'Super Administrator'}
@@ -143,6 +176,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               currentUser={currentUser}
               onRefreshStats={() => {}}
             />
+          )}
+
+          {currentView === 'payment-accounts' && (
+            <PaymentAccountManagement currentUser={currentUser} />
           )}
 
           {currentView === 'premium-management' && (

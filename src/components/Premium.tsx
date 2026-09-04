@@ -15,13 +15,15 @@ import {
   RefreshCw,
   Eye,
 } from 'lucide-react';
-import { SubscriptionRecord, UserProfile } from '../types';
+import { SubscriptionRecord, UserProfile, PaymentAccount } from '../types';
 import {
   getUserProfile,
   fetchUserSubscriptions,
   createSubscriptionOrder,
-  uploadPaymentProof,
+  submitPaymentProofOrder,
+  validatePaymentProofFile,
 } from '../services/accessControlService';
+import { getActivePaymentAccounts } from '../services/paymentAccountService';
 
 interface PremiumProps {
   onBack: () => void;
@@ -84,12 +86,19 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Dynamic Payment Accounts (Tahap 8C)
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+
   // Modal State for Payment & Upload Proof
   const [selectedPlan, setSelectedPlan] = useState<PackagePlan | null>(null);
   const [activeSubscriptionId, setActiveSubscriptionId] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [submittingProof, setSubmittingProof] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
+  const [uploadStatusMessage, setUploadStatusMessage] = useState<string>('');
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copiedBank, setCopiedBank] = useState<string | null>(null);
@@ -99,16 +108,20 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [userProf, userSubs] = await Promise.all([
+      setLoadingAccounts(true);
+      const [userProf, userSubs, activeAccounts] = await Promise.all([
         getUserProfile(),
         fetchUserSubscriptions(),
+        getActivePaymentAccounts(),
       ]);
       setProfile(userProf);
       setSubscriptions(userSubs);
+      setPaymentAccounts(activeAccounts);
     } catch (err) {
-      console.error('Failed to load subscription data:', err);
+      console.error('Failed to load subscription or payment account data:', err);
     } finally {
       setLoading(false);
+      setLoadingAccounts(false);
     }
   };
 
@@ -120,9 +133,16 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
     try {
       setUploadError(null);
       setSubmissionSuccess(false);
+      setUploadStatus('idle');
+      setUploadStatusMessage('');
       setProofFile(null);
       setProofPreview(null);
       setSelectedPlan(pkg);
+
+      // Refresh active payment accounts in background
+      getActivePaymentAccounts()
+        .then((accs) => setPaymentAccounts(accs))
+        .catch((e) => console.error('Failed to refresh payment accounts:', e));
 
       // Create new pending subscription record in Firestore
       const newSub = await createSubscriptionOrder({
@@ -141,11 +161,27 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setProofFile(file);
+    if (!file) return;
+
+    // 1. Immediate validation of MIME type and file size
+    const validation = validatePaymentProofFile(file);
+    if (!validation.isValid) {
+      setUploadError(validation.error || 'Format atau ukuran file tidak didukung.');
+      setProofFile(null);
+      setProofPreview(null);
+      return;
+    }
+
+    setProofFile(file);
+    setUploadError(null);
+    setUploadStatus('idle');
+    setUploadStatusMessage('');
+
+    if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
       setProofPreview(url);
-      setUploadError(null);
+    } else {
+      setProofPreview(null);
     }
   };
 
@@ -155,30 +191,53 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
       return;
     }
 
+    const validation = validatePaymentProofFile(proofFile);
+    if (!validation.isValid) {
+      setUploadError(validation.error || 'File tidak valid.');
+      return;
+    }
+
     try {
       setSubmittingProof(true);
       setUploadError(null);
+      setUploadStatus('uploading');
 
-      const updated = await uploadPaymentProof(activeSubscriptionId, proofFile);
+      const updated = await submitPaymentProofOrder({
+        subscriptionId: activeSubscriptionId,
+        plan: selectedPlan?.name || 'PREMIUM',
+        price: selectedPlan?.price || 0,
+        duration: selectedPlan?.duration || '30 Hari',
+        file: proofFile,
+        onStateChange: (state, message) => {
+          setUploadStatus(state);
+          if (message) setUploadStatusMessage(message);
+        },
+      });
 
+      setUploadStatus('success');
       setSubmissionSuccess(true);
       setSubscriptions((prev) =>
         prev.map((s) => (s.id === activeSubscriptionId ? updated : s))
       );
-      // Reload profile and subscriptions
+      // Realtime refetch of user profile and subscriptions
       await loadData();
     } catch (err: any) {
       console.error('Error submitting proof:', err);
-      setUploadError(err.message || 'Gagal mengunggah bukti pembayaran. Silakan coba lagi.');
+      setUploadStatus('error');
+      setUploadError(err.message || 'Bukti transfer gagal diunggah. Silakan coba lagi.');
     } finally {
       setSubmittingProof(false);
     }
   };
 
-  const handleCopy = (text: string, bankName: string) => {
+  const handleCopy = (text: string, bankId: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedBank(bankName);
-    setTimeout(() => setCopiedBank(null), 2500);
+    setCopiedBank(bankId);
+    setCopyToast('Nomor rekening berhasil disalin');
+    setTimeout(() => {
+      setCopiedBank(null);
+      setCopyToast(null);
+    }, 2500);
   };
 
   const formatDate = (isoString?: string | null) => {
@@ -522,53 +581,75 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                 </div>
               </div>
 
-              {/* Bank Accounts */}
+              {/* Bank Accounts (Tahap 8C Dynamic) */}
               <div className="space-y-3 mb-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
-                  Rekening Tujuan Transfer
-                </span>
-
-                {/* BCA */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-blue-700 block">BCA (Bank Central Asia)</span>
-                    <span className="text-sm font-mono font-bold text-slate-900">8735-092-114</span>
-                    <span className="text-[11px] text-slate-400 block">a.n. PT ARVIN DIGITAL KREATIF</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy('8735092114', 'BCA')}
-                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    {copiedBank === 'BCA' ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                    <span>{copiedBank === 'BCA' ? 'Disalin' : 'Salin'}</span>
-                  </button>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
+                    Rekening Tujuan Transfer
+                  </span>
+                  {copyToast && (
+                    <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 animate-in fade-in duration-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      {copyToast}
+                    </span>
+                  )}
                 </div>
 
-                {/* Mandiri */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-amber-800 block">Bank Mandiri</span>
-                    <span className="text-sm font-mono font-bold text-slate-900">137-00-2299881</span>
-                    <span className="text-[11px] text-slate-400 block">a.n. PT ARVIN DIGITAL KREATIF</span>
+                {loadingAccounts ? (
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-500 gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-slate-600" />
+                    <span>Memuat rekening pembayaran...</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy('137002299881', 'Mandiri')}
-                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    {copiedBank === 'Mandiri' ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                    <span>{copiedBank === 'Mandiri' ? 'Disalin' : 'Salin'}</span>
-                  </button>
-                </div>
+                ) : paymentAccounts.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-xs flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Rekening pembayaran sedang dipersiapkan. Silakan hubungi Admin.</span>
+                  </div>
+                ) : (
+                  paymentAccounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="p-3.5 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-3 shadow-2xs hover:border-slate-300 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs font-bold text-slate-900 truncate">
+                            {account.bankName}
+                          </span>
+                          {account.description && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 truncate max-w-[140px]">
+                              {account.description}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm font-mono font-extrabold text-slate-900 tracking-wide block">
+                          {account.accountNumber}
+                        </span>
+                        <span className="text-[11px] text-slate-500 block truncate">
+                          a.n. {account.accountName}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(account.accountNumber, account.id)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 active:bg-slate-100 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-2xs"
+                        title="Salin Nomor Rekening"
+                      >
+                        {copiedBank === account.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-emerald-700 font-bold">Disalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Upload Proof Area */}
@@ -588,17 +669,23 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                   <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 space-y-2">
                     <div className="flex items-center gap-2 font-bold text-sm">
                       <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <span>Bukti Pembayaran Terkirim!</span>
+                      <span>Bukti transfer berhasil diunggah. Menunggu verifikasi admin.</span>
                     </div>
                     <p className="text-xs leading-relaxed text-emerald-700">
-                      Bukti transfer berhasil disimpan ke Firebase Storage. Tim Admin akan memverifikasi pembayaran Anda (Status: <strong>PAYMENT_SUBMITTED</strong>). Akun Premium Anda akan aktif secara otomatis setelah diverifikasi dan disetujui.
+                      File bukti transfer Anda telah tersimpan dengan aman di Firebase Storage. Status pesanan Anda kini <strong>PAYMENT_SUBMITTED</strong>. Super Admin akan memverifikasi pembayaran Anda segera.
                     </p>
                     <button
                       type="button"
-                      onClick={() => setSelectedPlan(null)}
+                      onClick={() => {
+                        setSelectedPlan(null);
+                        setSubmissionSuccess(false);
+                        setUploadStatus('idle');
+                        setProofFile(null);
+                        setProofPreview(null);
+                      }}
                       className="mt-2 w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors cursor-pointer"
                     >
-                      Selesai
+                      Selesai & Tutup
                     </button>
                   </div>
                 ) : (
@@ -606,26 +693,46 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
                       onChange={handleFileChange}
                       className="hidden"
                     />
 
-                    {proofPreview ? (
+                    {proofFile ? (
                       <div className="space-y-2">
-                        <div className="relative rounded-2xl overflow-hidden border border-slate-200 max-h-48 bg-slate-900 flex items-center justify-center">
-                          <img
-                            src={proofPreview}
-                            alt="Bukti Transfer"
-                            className="max-h-48 object-contain w-full"
-                          />
+                        {proofPreview ? (
+                          <div className="relative rounded-2xl overflow-hidden border border-slate-200 max-h-48 bg-slate-900 flex items-center justify-center">
+                            <img
+                              src={proofPreview}
+                              alt="Preview Bukti Transfer"
+                              className="max-h-48 object-contain w-full"
+                            />
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex items-center gap-3">
+                            <FileText className="w-8 h-8 text-blue-600 shrink-0" />
+                            <div className="text-xs truncate">
+                              <span className="font-bold text-slate-800 block truncate">{proofFile.name}</span>
+                              <span className="text-slate-500 text-[11px]">Dokumen PDF</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* File details */}
+                        <div className="flex items-center justify-between text-[11px] text-slate-600 px-1">
+                          <span className="font-medium truncate max-w-[240px]">{proofFile.name}</span>
+                          <span className="font-mono text-slate-500 shrink-0">
+                            {(proofFile.size / (1024 * 1024)).toFixed(2)} MB
+                          </span>
                         </div>
+
                         <button
                           type="button"
+                          disabled={submittingProof}
                           onClick={() => fileInputRef.current?.click()}
-                          className="text-xs text-slate-600 hover:underline block text-center w-full cursor-pointer"
+                          className="text-xs text-slate-600 hover:underline block text-center w-full cursor-pointer disabled:opacity-50"
                         >
-                          Ganti foto bukti transfer
+                          Ganti file bukti transfer
                         </button>
                       </div>
                     ) : (
@@ -635,10 +742,10 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                       >
                         <Upload className="w-7 h-7 text-slate-400 mx-auto mb-2" />
                         <span className="text-xs font-bold text-slate-700 block">
-                          Klik untuk memilih foto bukti transfer
+                          Klik untuk memilih bukti transfer
                         </span>
                         <span className="text-[11px] text-slate-400 block mt-1">
-                          Format JPG, PNG, atau WEBP (maks. 5MB)
+                          Format JPG, PNG, WEBP, atau PDF (maks. 5MB)
                         </span>
                       </div>
                     )}
@@ -647,26 +754,38 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                       <button
                         type="button"
                         id="btn-submit-payment-proof"
-                        disabled={submittingProof || !proofFile}
+                        disabled={submittingProof || !proofFile || uploadStatus === 'success'}
                         onClick={handleSubmitProof}
-                        className="flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        className="flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                       >
-                        {submittingProof ? (
+                        {uploadStatus === 'uploading' || uploadStatus === 'processing' ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Mengunggah...</span>
+                            <span>{uploadStatusMessage || 'Mengunggah...'}</span>
+                          </>
+                        ) : uploadStatus === 'success' ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span>Berhasil Diunggah</span>
                           </>
                         ) : (
                           <>
                             <Upload className="w-4 h-4" />
-                            <span>Kirim Bukti Pembayaran</span>
+                            <span>Unggah Bukti</span>
                           </>
                         )}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedPlan(null)}
-                        className="py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium text-xs sm:text-sm transition-colors cursor-pointer"
+                        disabled={submittingProof}
+                        onClick={() => {
+                          setSelectedPlan(null);
+                          setProofFile(null);
+                          setProofPreview(null);
+                          setUploadError(null);
+                          setUploadStatus('idle');
+                        }}
+                        className="py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium text-xs sm:text-sm transition-colors cursor-pointer disabled:opacity-50"
                       >
                         Batal
                       </button>

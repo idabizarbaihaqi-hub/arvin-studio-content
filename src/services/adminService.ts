@@ -5,6 +5,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  runTransaction,
   query,
   orderBy,
   limit,
@@ -35,6 +36,7 @@ export function isPrimarySuperAdmin(user?: { email?: string } | null): boolean {
 export async function logAdminActivity(payload: {
   adminUser: UserProfile;
   action: string;
+  targetId?: string | null;
   targetUserId?: string | null;
   targetSubscriptionId?: string | null;
   description: string;
@@ -47,6 +49,7 @@ export async function logAdminActivity(payload: {
     adminId: payload.adminUser.uid || payload.adminUser.id,
     adminEmail: payload.adminUser.email,
     action: payload.action,
+    targetId: payload.targetId || null,
     targetUserId: payload.targetUserId || null,
     targetSubscriptionId: payload.targetSubscriptionId || null,
     description: payload.description,
@@ -306,69 +309,151 @@ export async function getPendingPayments(): Promise<SubscriptionRecord[]> {
 }
 
 /**
- * Approve subscription payment, activate user premium plan, and log action
+ * Helper to calculate plan expiration date based on duration or plan name
+ * "7_DAYS" -> startDate + 7 days
+ * "30_DAYS" -> startDate + 30 days
+ * "12_MONTHS" -> startDate + 12 months (or 365 days)
+ */
+export function calculatePlanEndDate(
+  planName?: string,
+  durationStr?: string,
+  startDate: Date = new Date()
+): string {
+  const p = (planName || '').toUpperCase();
+  const d = (durationStr || '').toUpperCase();
+  const end = new Date(startDate.getTime());
+
+  if (
+    p.includes('12_MONTHS') ||
+    p.includes('12 BULAN') ||
+    p.includes('YEAR') ||
+    p.includes('1 TAHUN') ||
+    d.includes('12 BULAN') ||
+    d.includes('TAHUN')
+  ) {
+    // 12 Months
+    end.setFullYear(end.getFullYear() + 1);
+  } else if (
+    p.includes('7_DAYS') ||
+    p.includes('7 HARI') ||
+    p.includes('WEEK') ||
+    d.includes('7 HARI') ||
+    d.includes('MINGGU')
+  ) {
+    // 7 Days
+    end.setDate(end.getDate() + 7);
+  } else {
+    // Default 30 Days (30_DAYS / 30 HARI / MONTH)
+    end.setDate(end.getDate() + 30);
+  }
+
+  return end.toISOString();
+}
+
+/**
+ * Approve subscription payment atomically via Firestore transaction,
+ * activates user PREMIUM plan, and records admin activity log.
  */
 export async function approvePayment(
   subscriptionId: string,
   adminUser: UserProfile
 ): Promise<void> {
-  const subDocRef = doc(db, 'subscriptions', subscriptionId);
-  const subSnap = await getDoc(subDocRef);
-
-  if (!subSnap.exists()) {
-    throw new Error('Data langganan tidak ditemukan.');
+  if (!subscriptionId || !subscriptionId.trim()) {
+    throw new Error('ID pembayaran tidak ditemukan.');
   }
 
-  const sub = subSnap.data() as SubscriptionRecord;
-  const now = new Date();
-  const startDate = now.toISOString();
-
-  // Calculate expiration date based on duration
-  const endDate = new Date(now);
-  const durLower = (sub.duration || '').toLowerCase();
-  const planLower = (sub.plan || '').toLowerCase();
-
-  if (durLower.includes('tahun') || planLower.includes('yearly')) {
-    endDate.setFullYear(endDate.getFullYear() + 1);
-  } else if (durLower.includes('minggu') || planLower.includes('weekly')) {
-    endDate.setDate(endDate.getDate() + 7);
-  } else {
-    // Default 1 month (30 days)
-    endDate.setDate(endDate.getDate() + 30);
+  if (
+    !adminUser ||
+    (!isPrimarySuperAdmin(adminUser) &&
+      adminUser.role !== 'SUPER_ADMIN' &&
+      adminUser.adminAccess !== true)
+  ) {
+    throw new Error('Akses ditolak. Hanya Super Admin yang berwenang menyetujui pembayaran.');
   }
 
-  const endDateStr = endDate.toISOString();
+  const subDocRef = doc(db, 'subscriptions', subscriptionId.trim());
 
-  // 1. Update subscription document
-  await updateDoc(subDocRef, {
-    status: 'APPROVED',
-    startDate,
-    endDate: endDateStr,
-    reviewedAt: startDate,
-    reviewedBy: adminUser.email || adminUser.fullName || 'Super Admin',
-    updatedAt: startDate,
-  });
+  let targetUserId = '';
+  let subPlan = '';
+  let subDuration = '';
+  let subPrice = 0;
+  let calculatedEndDateStr = '';
 
-  // 2. Update user profile to activate PREMIUM
-  const userDocRef = doc(db, 'users', sub.userId);
-  const userSnap = await getDoc(userDocRef);
-  if (userSnap.exists()) {
-    await updateDoc(userDocRef, {
+  // Atomic transaction to ensure consistency between subscriptions and users collections
+  await runTransaction(db, async (transaction) => {
+    const subSnap = await transaction.get(subDocRef);
+    if (!subSnap.exists()) {
+      throw new Error('ID pembayaran tidak ditemukan di database.');
+    }
+
+    const sub = subSnap.data() as SubscriptionRecord;
+
+    if (!sub.userId || !sub.userId.trim()) {
+      throw new Error('Data user pada pembayaran tidak ditemukan.');
+    }
+
+    // Status checks
+    if (sub.status === 'APPROVED') {
+      throw new Error('Pembayaran ini sudah disetujui.');
+    }
+    if (sub.status === 'REJECTED') {
+      throw new Error('Pembayaran ini telah ditolak sebelumnya.');
+    }
+    if (sub.status === 'EXPIRED') {
+      throw new Error('Pembayaran ini sudah kedaluwarsa.');
+    }
+    const approvableStatuses = ['PAYMENT_SUBMITTED', 'UNDER_REVIEW', 'PENDING_PAYMENT'];
+    if (!approvableStatuses.includes(sub.status)) {
+      throw new Error(`Status pembayaran tidak valid untuk disetujui (${sub.status}).`);
+    }
+
+    targetUserId = sub.userId.trim();
+    subPlan = sub.plan || 'PREMIUM';
+    subDuration = sub.duration || '-';
+    subPrice = sub.price || 0;
+
+    const userDocRef = doc(db, 'users', targetUserId);
+    const userSnap = await transaction.get(userDocRef);
+    if (!userSnap.exists()) {
+      throw new Error('Data profil user pemesan tidak ditemukan di sistem.');
+    }
+
+    const now = new Date();
+    const startDateStr = now.toISOString();
+    calculatedEndDateStr = calculatePlanEndDate(sub.plan, sub.duration, now);
+    const adminIdentifier = adminUser.email || adminUser.uid || 'Super Admin';
+
+    // 1. Atomic update subscription document
+    transaction.update(subDocRef, {
+      status: 'APPROVED',
+      startDate: startDateStr,
+      endDate: calculatedEndDateStr,
+      reviewedAt: startDateStr,
+      reviewedBy: adminIdentifier,
+      updatedAt: startDateStr,
+    });
+
+    // 2. Atomic update user profile to PREMIUM ACTIVE
+    transaction.update(userDocRef, {
       plan: 'PREMIUM',
       subscriptionStatus: 'ACTIVE',
-      subscriptionExpiry: endDateStr,
-      updatedAt: startDate,
+      subscriptionExpiry: calculatedEndDateStr,
+      updatedAt: startDateStr,
     });
-  }
-
-  // 3. Log into admin_activity_logs
-  await logAdminActivity({
-    adminUser,
-    action: 'SUPER_ADMIN_APPROVED_PAYMENT',
-    targetUserId: sub.userId,
-    targetSubscriptionId: subscriptionId,
-    description: `Menyetujui pembayaran langganan paket ${sub.plan} (${sub.duration}) seharga Rp ${sub.price?.toLocaleString('id-ID')}`,
   });
+
+  // 3. Record Admin Activity Log
+  try {
+    await logAdminActivity({
+      adminUser,
+      action: 'APPROVE_PAYMENT',
+      targetUserId,
+      targetSubscriptionId: subscriptionId,
+      description: `Menyetujui pembayaran langganan paket ${subPlan} (${subDuration}) seharga Rp ${subPrice.toLocaleString('id-ID')}. Akun user aktif hingga ${new Date(calculatedEndDateStr).toLocaleDateString('id-ID')}.`,
+    });
+  } catch (logErr) {
+    console.warn('Gagal mencatat log aktivitas admin:', logErr);
+  }
 }
 
 /**
@@ -380,37 +465,64 @@ export async function rejectPayment(
   reason: string
 ): Promise<void> {
   const cleanReason = reason.trim();
+  if (!subscriptionId || !subscriptionId.trim()) {
+    throw new Error('ID pembayaran tidak ditemukan.');
+  }
   if (!cleanReason) {
     throw new Error('Alasan penolakan wajib diisi.');
   }
 
-  const subDocRef = doc(db, 'subscriptions', subscriptionId);
-  const subSnap = await getDoc(subDocRef);
-
-  if (!subSnap.exists()) {
-    throw new Error('Data langganan tidak ditemukan.');
+  if (
+    !adminUser ||
+    (!isPrimarySuperAdmin(adminUser) &&
+      adminUser.role !== 'SUPER_ADMIN' &&
+      adminUser.adminAccess !== true)
+  ) {
+    throw new Error('Akses ditolak. Hanya Super Admin yang berwenang menolak pembayaran.');
   }
 
-  const sub = subSnap.data() as SubscriptionRecord;
-  const now = new Date().toISOString();
+  const subDocRef = doc(db, 'subscriptions', subscriptionId.trim());
+  let targetUserId = '';
+  let subPlan = '';
 
-  // 1. Update subscription document
-  await updateDoc(subDocRef, {
-    status: 'REJECTED',
-    rejectionReason: cleanReason,
-    reviewedAt: now,
-    reviewedBy: adminUser.email || adminUser.fullName || 'Super Admin',
-    updatedAt: now,
+  await runTransaction(db, async (transaction) => {
+    const subSnap = await transaction.get(subDocRef);
+    if (!subSnap.exists()) {
+      throw new Error('ID pembayaran tidak ditemukan.');
+    }
+
+    const sub = subSnap.data() as SubscriptionRecord;
+    if (sub.status === 'APPROVED') {
+      throw new Error('Pembayaran ini sudah disetujui dan tidak dapat ditolak.');
+    }
+
+    targetUserId = sub.userId || '';
+    subPlan = sub.plan || 'PREMIUM';
+
+    const now = new Date().toISOString();
+    const adminIdentifier = adminUser.email || adminUser.uid || 'Super Admin';
+
+    transaction.update(subDocRef, {
+      status: 'REJECTED',
+      rejectionReason: cleanReason,
+      reviewedAt: now,
+      reviewedBy: adminIdentifier,
+      updatedAt: now,
+    });
   });
 
-  // 2. Log activity
-  await logAdminActivity({
-    adminUser,
-    action: 'SUPER_ADMIN_REJECTED_PAYMENT',
-    targetUserId: sub.userId,
-    targetSubscriptionId: subscriptionId,
-    description: `Menolak pembayaran langganan ${sub.plan} untuk user ${sub.userId}. Alasan: ${cleanReason}`,
-  });
+  // Record activity log
+  try {
+    await logAdminActivity({
+      adminUser,
+      action: 'REJECT_PAYMENT',
+      targetUserId,
+      targetSubscriptionId: subscriptionId,
+      description: `Menolak pembayaran langganan ${subPlan} untuk user ${targetUserId}. Alasan: ${cleanReason}`,
+    });
+  } catch (logErr) {
+    console.warn('Gagal mencatat log aktivitas admin:', logErr);
+  }
 }
 
 /**

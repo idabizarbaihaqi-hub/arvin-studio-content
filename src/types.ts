@@ -564,6 +564,19 @@ export type PaymentSubscriptionStatus =
   | 'REJECTED'
   | 'EXPIRED';
 
+export interface PaymentAccount {
+  id: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
 export interface SubscriptionRecord {
   id: string;
   userId: string;
@@ -572,6 +585,12 @@ export interface SubscriptionRecord {
   duration: string;
   status: PaymentSubscriptionStatus;
   paymentProofUrl?: string | null;
+  paymentAccountId?: string | null;
+  paymentAccountSnapshot?: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+  } | null;
   submittedAt?: string | null;
   reviewedAt?: string | null;
   reviewedBy?: string | null;
@@ -668,6 +687,7 @@ export type AdminViewKey =
   | 'user-management'
   | 'premium-management'
   | 'payment-verification'
+  | 'payment-accounts'
   | 'credit-management'
   | 'ai-usage'
   | 'content-history'
@@ -680,6 +700,7 @@ export interface AdminActivityLog {
   adminId: string;
   adminEmail?: string;
   action: string;
+  targetId?: string | null;
   targetUserId?: string | null;
   targetSubscriptionId?: string | null;
   description: string;
@@ -694,6 +715,8 @@ export interface AdminDashboardMetrics {
   totalAiUsage: number;
   activeSubscriptions: number;
   revenue: number;
+  totalPaymentAccounts: number;
+  activePaymentAccounts: number;
 }
 
 

@@ -384,45 +384,319 @@ export async function createSubscriptionOrder(params: {
   return record;
 }
 
-export async function uploadPaymentProof(
-  subscriptionId: string,
-  file: File
-): Promise<SubscriptionRecord> {
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Silakan login terlebih dahulu.');
+/**
+ * Validates payment proof file format and size
+ */
+export function validatePaymentProofFile(file: File): { isValid: boolean; error?: string } {
+  if (!file) {
+    return { isValid: false, error: 'Silakan pilih file bukti transfer.' };
+  }
 
-  let downloadUrl = '';
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const isAllowedExt = ['jpg', 'jpeg', 'png', 'webp', 'pdf'].includes(ext);
+  const isAllowedType = allowedMimeTypes.includes(file.type) || isAllowedExt;
 
-  // 1. Try Firebase Storage upload
-  try {
-    const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const storageRef = ref(storage, `payment_proofs/${uid}/${fileName}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    downloadUrl = await getDownloadURL(snapshot.ref);
-  } catch (storageErr) {
-    console.warn('Firebase Storage upload warning, using secure Data URL fallback:', storageErr);
-    // Safe Base64 fallback if storage bucket has CORS or permissions limitation
-    downloadUrl = await new Promise<string>((resolve, reject) => {
+  if (!isAllowedType) {
+    return { isValid: false, error: 'Bukti transfer harus berupa JPG, PNG, WEBP, atau PDF.' };
+  }
+
+  const maxSizeBytes = 5 * 1024 * 1024; // 5 MB
+  if (file.size > maxSizeBytes) {
+    return { isValid: false, error: 'Bukti transfer maksimal 5 MB.' };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Optimizes a payment proof image using HTML5 Canvas:
+ * Resizes to max 1280x1280 and converts to JPEG 0.78 quality.
+ * Returns a compact data URL (typically 60KB - 160KB).
+ */
+export async function optimizePaymentProofImage(file: File): Promise<string> {
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onerror = () => reject(new Error('Gagal membaca dokumen PDF bukti transfer.'));
       reader.readAsDataURL(file);
     });
   }
 
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => resolve('');
+    reader.onload = (e) => {
+      const dataUri = e.target?.result as string;
+      if (!dataUri) {
+        resolve('');
+        return;
+      }
+      const img = new Image();
+      img.onerror = () => resolve(dataUri);
+      img.onload = () => {
+        try {
+          const maxDimension = 1280;
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(width, 1);
+          canvas.height = Math.max(height, 1);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUri);
+            return;
+          }
+
+          // Fill white background for PNG transparency before JPEG conversion
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const compressed = canvas.toDataURL('image/jpeg', 0.78);
+          resolve(compressed);
+        } catch {
+          resolve(dataUri);
+        }
+      };
+      img.src = dataUri;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Submit payment proof and save subscription order in Firestore.
+ * Strictly follows the required flow:
+ * 1. Validate file & auth
+ * 2. Upload to Firebase Storage or use optimized Data URL if storage is unavailable/times out
+ * 3. Retrieve download URL
+ * 4. Save/update subscription record in Firestore with status 'PAYMENT_SUBMITTED' and 'paymentProofUrl'
+ */
+export async function submitPaymentProofOrder(params: {
+  subscriptionId: string;
+  plan: string;
+  price: number;
+  duration: string;
+  file: File;
+  onStateChange?: (state: 'idle' | 'uploading' | 'processing' | 'success' | 'error', message?: string) => void;
+}): Promise<SubscriptionRecord> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    params.onStateChange?.('error', 'Sesi telah berakhir. Silakan login kembali.');
+    throw new Error('Sesi telah berakhir. Silakan login kembali.');
+  }
+
+  const { subscriptionId, plan, price, duration, file, onStateChange } = params;
+
+  // 1. Validate file
+  const validation = validatePaymentProofFile(file);
+  if (!validation.isValid) {
+    onStateChange?.('error', validation.error);
+    throw new Error(validation.error);
+  }
+
+  console.log('[1. FILE_SELECTED]', {
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    subscriptionId,
+    userId: uid,
+  });
+
+  onStateChange?.('uploading', 'Mengunggah bukti transfer...');
+
+  // 2. Upload to Firebase Storage with fast fallback
+  const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const uniqueFileName = `${Date.now()}_${sanitizedFileName}`;
+  const storagePath = `payment_proofs/${uid}/${subscriptionId}/${uniqueFileName}`;
+  console.log('[2. STORAGE_UPLOAD_STARTED]', storagePath);
+
+  const storageRef = ref(storage, storagePath);
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+  let downloadUrl = '';
+  try {
+    // 3-second timeout for Firebase Storage attempt
+    const uploadPromise = (async () => {
+      const snapshot = await uploadBytes(storageRef, file, {
+        contentType: file.type || (ext === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+      });
+      return await getDownloadURL(snapshot.ref);
+    })();
+
+    const timeoutPromise = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error('STORAGE_TIMEOUT')), 3000)
+    );
+
+    downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
+    console.log('[3. STORAGE_UPLOAD_COMPLETED]', downloadUrl.substring(0, 60));
+  } catch (storageErr: any) {
+    console.warn('[STORAGE_FALLBACK]', storageErr?.message || storageErr);
+    // Seamless fallback to optimized data URL: instant, ultra-reliable, never hangs
+    downloadUrl = await optimizePaymentProofImage(file);
+  }
+
+  if (!downloadUrl) {
+    onStateChange?.('error', 'Bukti transfer gagal diunggah. Silakan coba lagi.');
+    throw new Error('Bukti transfer gagal diunggah. Silakan coba lagi.');
+  }
+
+  // 3. Save / Update in Firestore
+  onStateChange?.('processing', 'Menyimpan data pembayaran...');
+  console.log('[4. FIRESTORE_UPDATE_STARTED]', subscriptionId);
+
   const now = new Date().toISOString();
   const subDocRef = doc(db, 'subscriptions', subscriptionId);
 
-  // Status becomes PAYMENT_SUBMITTED, still NOT approved yet!
-  await updateDoc(subDocRef, {
-    paymentProofUrl: downloadUrl,
-    submittedAt: now,
-    status: 'PAYMENT_SUBMITTED',
-    updatedAt: now,
-  });
+  try {
+    const existingSnap = await getDoc(subDocRef);
+    let finalRecord: SubscriptionRecord;
 
-  const updatedSnap = await getDoc(subDocRef);
-  return updatedSnap.data() as SubscriptionRecord;
+    if (existingSnap.exists()) {
+      const existingData = existingSnap.data() as SubscriptionRecord;
+      finalRecord = {
+        ...existingData,
+        paymentProofUrl: downloadUrl,
+        submittedAt: now,
+        status: 'PAYMENT_SUBMITTED',
+        updatedAt: now,
+      };
+      await updateDoc(subDocRef, {
+        paymentProofUrl: downloadUrl,
+        submittedAt: now,
+        status: 'PAYMENT_SUBMITTED',
+        updatedAt: now,
+      });
+    } else {
+      finalRecord = {
+        id: subscriptionId,
+        userId: uid,
+        plan,
+        price,
+        duration,
+        status: 'PAYMENT_SUBMITTED',
+        paymentProofUrl: downloadUrl,
+        submittedAt: now,
+        reviewedAt: null,
+        reviewedBy: null,
+        rejectionReason: null,
+        startDate: null,
+        endDate: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await setDoc(subDocRef, finalRecord);
+    }
+
+    console.log('[5. FIRESTORE_UPDATE_COMPLETED]', finalRecord.id);
+    onStateChange?.('success', 'Bukti transfer berhasil dikirim dan sedang menunggu verifikasi Admin.');
+    return finalRecord;
+  } catch (firestoreErr: any) {
+    console.error('[FIRESTORE_UPDATE_FAILED]', firestoreErr);
+    onStateChange?.('error', 'Gagal menyimpan data pembayaran ke database. Silakan coba lagi.');
+    throw new Error('Gagal menyimpan data pembayaran. Silakan coba lagi.');
+  }
+}
+
+export async function uploadPaymentProof(
+  subscriptionId: string,
+  file: File,
+  planDetails?: { plan: string; price: number; duration: string }
+): Promise<SubscriptionRecord> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Silakan login terlebih dahulu.');
+
+  // Validate file
+  const validation = validatePaymentProofFile(file);
+  if (!validation.isValid) {
+    throw new Error(validation.error);
+  }
+
+  console.log('[1. FILE_SELECTED]', { name: file.name, size: file.size, type: file.type, subscriptionId });
+
+  const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const uniqueFileName = `${Date.now()}_${sanitizedFileName}`;
+  const storagePath = `payment_proofs/${uid}/${subscriptionId}/${uniqueFileName}`;
+  console.log('[2. STORAGE_UPLOAD_STARTED]', storagePath);
+
+  const storageRef = ref(storage, storagePath);
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+  let downloadUrl = '';
+  try {
+    const uploadPromise = (async () => {
+      const snapshot = await uploadBytes(storageRef, file, {
+        contentType: file.type || (ext === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+      });
+      return await getDownloadURL(snapshot.ref);
+    })();
+
+    const timeoutPromise = new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error('STORAGE_TIMEOUT')), 3000)
+    );
+
+    downloadUrl = await Promise.race([uploadPromise, timeoutPromise]);
+  } catch (storageErr: any) {
+    console.warn('[STORAGE_FALLBACK]', storageErr?.message || storageErr);
+    downloadUrl = await optimizePaymentProofImage(file);
+  }
+
+  if (!downloadUrl) {
+    throw new Error('Bukti transfer gagal diunggah. Silakan coba lagi.');
+  }
+
+  console.log('[3. FIRESTORE_UPDATE_STARTED]', subscriptionId);
+  const now = new Date().toISOString();
+  const subDocRef = doc(db, 'subscriptions', subscriptionId);
+
+  const existingSnap = await getDoc(subDocRef);
+  let result: SubscriptionRecord;
+
+  if (existingSnap.exists()) {
+    await updateDoc(subDocRef, {
+      paymentProofUrl: downloadUrl,
+      submittedAt: now,
+      status: 'PAYMENT_SUBMITTED',
+      updatedAt: now,
+    });
+    const updatedSnap = await getDoc(subDocRef);
+    result = updatedSnap.data() as SubscriptionRecord;
+  } else {
+    result = {
+      id: subscriptionId,
+      userId: uid,
+      plan: planDetails?.plan || 'PREMIUM',
+      price: planDetails?.price || 0,
+      duration: planDetails?.duration || '-',
+      status: 'PAYMENT_SUBMITTED',
+      paymentProofUrl: downloadUrl,
+      submittedAt: now,
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectionReason: null,
+      startDate: null,
+      endDate: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await setDoc(subDocRef, result);
+  }
+
+  console.log('[4. FIRESTORE_UPDATE_COMPLETED]', result.id);
+  return result;
 }
 
 // ----------------------------------------------------

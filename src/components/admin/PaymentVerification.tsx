@@ -11,6 +11,7 @@ import {
   Calendar,
   X,
   FileCheck,
+  FileText,
 } from 'lucide-react';
 import { SubscriptionRecord, UserProfile } from '../../types';
 import { getPendingPayments, approvePayment, rejectPayment } from '../../services/adminService';
@@ -34,6 +35,7 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
   const [rejectionReason, setRejectionReason] = useState('Bukti transfer tidak jelas / blur');
   const [customReason, setCustomReason] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -51,24 +53,40 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
     loadData();
   }, []);
 
-  // Handle Approve
+  // Handle Approve - Pure atomic Firestore transaction, no window.confirm
   const handleApprove = async (sub: SubscriptionRecord) => {
-    if (!currentUser) return;
-    const confirmApprove = window.confirm(
-      `Setujui pembayaran paket ${sub.plan} (${sub.duration}) seharga Rp ${(sub.price || 0).toLocaleString('id-ID')} untuk user ${sub.userId}? Akun user akan langsung aktif menjadi PREMIUM.`
-    );
-    if (!confirmApprove) return;
+    if (!currentUser) {
+      setErrorMessage('Sesi Super Admin tidak valid. Silakan login kembali.');
+      return;
+    }
+
+    if (!sub.id || !sub.id.trim()) {
+      setErrorMessage('ID pembayaran tidak ditemukan.');
+      return;
+    }
+
+    if (!sub.userId || !sub.userId.trim()) {
+      setErrorMessage('Data user pada pembayaran tidak ditemukan.');
+      return;
+    }
+
+    if (sub.status === 'APPROVED') {
+      setErrorMessage('Pembayaran ini sudah disetujui.');
+      return;
+    }
 
     setProcessingId(sub.id);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       await approvePayment(sub.id, currentUser);
+      setSuccessMessage('Pembayaran berhasil disetujui. Akun user sekarang aktif sebagai Premium.');
       await loadData();
       onRefreshStats?.();
     } catch (err: any) {
       console.error('Approval failed:', err);
-      setErrorMessage(err.message || 'Gagal menyetujui pembayaran.');
+      setErrorMessage(err.message || 'Persetujuan pembayaran gagal. Silakan coba lagi.');
     } finally {
       setProcessingId(null);
     }
@@ -87,11 +105,13 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
 
     setProcessingId(rejectingSub.id);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       await rejectPayment(rejectingSub.id, currentUser, finalReason);
       setRejectingSub(null);
       setCustomReason('');
+      setSuccessMessage('Pembayaran berhasil ditolak.');
       await loadData();
       onRefreshStats?.();
     } catch (err: any) {
@@ -139,10 +159,34 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
         </button>
       </div>
 
+      {/* Notifications */}
+      {successMessage && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">{successMessage}</span>
+          </div>
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="text-emerald-700 hover:text-emerald-900 cursor-pointer p-0.5"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {errorMessage && (
-        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            onClick={() => setErrorMessage(null)}
+            className="text-red-600 hover:text-red-800 cursor-pointer p-0.5"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -177,7 +221,7 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
                     <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
                       {sub.status}
                     </span>
-                    <span className="text-[11px] text-slate-500">ID: {sub.id.slice(0, 10)}...</span>
+                    <span className="text-[11px] text-slate-500 font-mono">ID: {sub.id.slice(0, 10)}...</span>
                   </div>
                   <div className="text-xs font-black text-slate-900">
                     Rp {(sub.price || 0).toLocaleString('id-ID')}
@@ -215,21 +259,34 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
                   <div>
                     <span className="text-[11px] text-slate-600 font-semibold block mb-1.5">BUKTI TRANSFER</span>
                     {sub.paymentProofUrl ? (
-                      <div
-                        onClick={() => setPreviewImageUrl(sub.paymentProofUrl || null)}
-                        className="relative group rounded-xl border border-slate-200 overflow-hidden bg-slate-100 cursor-pointer h-36 flex items-center justify-center"
-                      >
-                        <img
-                          src={sub.paymentProofUrl}
-                          alt="Bukti transfer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-1 text-xs font-semibold">
-                          <Eye className="w-4 h-4" />
-                          <span>Perbesar Bukti</span>
+                      sub.paymentProofUrl.startsWith('data:application/pdf') || sub.paymentProofUrl.toLowerCase().includes('.pdf') ? (
+                        <div
+                          onClick={() => setPreviewImageUrl(sub.paymentProofUrl || null)}
+                          className="relative group rounded-xl border border-slate-200 p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer flex items-center justify-center gap-2 transition-colors h-28"
+                        >
+                          <FileText className="w-8 h-8 text-blue-600" />
+                          <div className="text-left">
+                            <span className="font-bold text-xs text-slate-800 block">Dokumen PDF</span>
+                            <span className="text-[10px] text-slate-500">Klik untuk melihat</span>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div
+                          onClick={() => setPreviewImageUrl(sub.paymentProofUrl || null)}
+                          className="relative group rounded-xl border border-slate-200 overflow-hidden bg-slate-100 cursor-pointer h-36 flex items-center justify-center"
+                        >
+                          <img
+                            src={sub.paymentProofUrl}
+                            alt="Bukti transfer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-1 text-xs font-semibold">
+                            <Eye className="w-4 h-4" />
+                            <span>Perbesar Bukti</span>
+                          </div>
+                        </div>
+                      )
                     ) : (
                       <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-[11px] flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
@@ -244,7 +301,7 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
                   <button
                     disabled={isProcessing}
                     onClick={() => setRejectingSub(sub)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 text-red-600 hover:bg-red-50 hover:border-red-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <XCircle className="w-3.5 h-3.5" />
                     <span>Tolak</span>
@@ -253,14 +310,19 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
                   <button
                     disabled={isProcessing}
                     onClick={() => handleApprove(sub)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isProcessing ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memproses persetujuan...</span>
+                      </>
                     ) : (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>SETUJUI</span>
+                      </>
                     )}
-                    <span>Setujui</span>
                   </button>
                 </div>
               </div>
@@ -335,10 +397,16 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
                 <button
                   type="submit"
                   disabled={processingId === rejectingSub.id}
-                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {processingId === rejectingSub.id && <RefreshCw className="w-3 h-3 animate-spin" />}
-                  <span>Tolak Pembayaran</span>
+                  {processingId === rejectingSub.id ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <span>Tolak Pembayaran</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -346,25 +414,41 @@ export const PaymentVerification: React.FC<PaymentVerificationProps> = ({
         </div>
       )}
 
-      {/* Image Proof Lightbox Modal */}
+      {/* Image / PDF Proof Lightbox Modal */}
       {previewImageUrl && (
         <div
           onClick={() => setPreviewImageUrl(null)}
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 cursor-zoom-out"
         >
-          <div className="relative max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl bg-slate-900 shadow-2xl">
-            <img
-              src={previewImageUrl}
-              alt="Bukti Transfer Penuh"
-              className="max-w-full max-h-[85vh] object-contain mx-auto"
-              referrerPolicy="no-referrer"
-            />
-            <button
-              onClick={() => setPreviewImageUrl(null)}
-              className="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-2xl bg-slate-900 shadow-2xl flex flex-col cursor-default"
+          >
+            <div className="p-3 bg-slate-800 flex items-center justify-between text-white border-b border-slate-700">
+              <span className="text-xs font-bold">Bukti Transfer</span>
+              <button
+                onClick={() => setPreviewImageUrl(null)}
+                className="p-1 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-2 overflow-auto flex-1 flex items-center justify-center min-h-[300px]">
+              {previewImageUrl.startsWith('data:application/pdf') || previewImageUrl.toLowerCase().includes('.pdf') ? (
+                <iframe
+                  src={previewImageUrl}
+                  title="PDF Bukti Transfer"
+                  className="w-full h-[70vh] rounded-lg border-0 bg-white"
+                />
+              ) : (
+                <img
+                  src={previewImageUrl}
+                  alt="Bukti Transfer Penuh"
+                  className="max-w-full max-h-[75vh] object-contain mx-auto rounded-lg"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

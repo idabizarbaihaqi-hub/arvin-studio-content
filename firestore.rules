@@ -15,9 +15,11 @@ service cloud.firestore {
     // Helper to check if current user is Super Admin
     function isSuperAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'id.abizarbaihaqi@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com') ||
         request.auth.token.superAdmin == true ||
-        request.auth.token.role == 'SUPER_ADMIN'
+        request.auth.token.role == 'SUPER_ADMIN' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN')
       );
     }
 
@@ -97,6 +99,15 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
       allow create: if isSuperAdmin();
       allow update, delete: if false; // Audit logs are immutable
+    }
+
+    // Match payment_accounts collection
+    match /payment_accounts/{accountId} {
+      // Authenticated users can read active accounts, Super Admin can read all
+      allow get: if isAuthenticated() && (resource == null || resource.data.isActive == true || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.isActive == true || isSuperAdmin());
+      // Only Super Admin can create, update, delete, enable, disable
+      allow create, update, delete: if isSuperAdmin();
     }
 
     // Deny all other paths
