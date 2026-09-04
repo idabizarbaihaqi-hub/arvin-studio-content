@@ -18,7 +18,14 @@ interface FirestoreMockDb {
   content_plans: Record<string, any>;
   ai_usage: Record<string, any>;
   ai_history: Record<string, any>;
+  users: Record<string, any>;
+  subscriptions: Record<string, any>;
+  credit_transactions: Record<string, any>;
+  daily_usage: Record<string, any>;
 }
+
+const DEFAULT_CREATOR_UID = "usr_agnesya_creator";
+const DEFAULT_CREATOR_EMAIL = "id.agnesyakartika@gmail.com";
 
 function getDatabase(): FirestoreMockDb {
   try {
@@ -26,25 +33,82 @@ function getDatabase(): FirestoreMockDb {
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
+    let db: FirestoreMockDb;
     if (!fs.existsSync(DB_FILE_PATH)) {
-      const initial: FirestoreMockDb = {
+      db = {
         content_plans: {},
         ai_usage: {},
         ai_history: {},
+        users: {},
+        subscriptions: {},
+        credit_transactions: {},
+        daily_usage: {},
       };
-      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(initial, null, 2), "utf-8");
-      return initial;
+    } else {
+      const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      db = {
+        content_plans: parsed.content_plans || {},
+        ai_usage: parsed.ai_usage || {},
+        ai_history: parsed.ai_history || {},
+        users: parsed.users || {},
+        subscriptions: parsed.subscriptions || {},
+        credit_transactions: parsed.credit_transactions || {},
+        daily_usage: parsed.daily_usage || {},
+      };
     }
-    const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
-    const parsed = JSON.parse(raw);
-    return {
-      content_plans: parsed.content_plans || {},
-      ai_usage: parsed.ai_usage || {},
-      ai_history: parsed.ai_history || {},
-    };
+
+    // Ensure default user exists if users collection does not have it
+    if (!db.users[DEFAULT_CREATOR_UID]) {
+      const now = new Date().toISOString();
+      db.users[DEFAULT_CREATOR_UID] = {
+        id: DEFAULT_CREATOR_UID,
+        email: DEFAULT_CREATOR_EMAIL,
+        displayName: "Agnesya Kartika",
+        username: "agnesyakartika",
+        photoURL: "",
+        bio: "Content Creator & Digital Strategist",
+        credits: 5,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      db.subscriptions[`sub_${DEFAULT_CREATOR_UID}`] = {
+        id: `sub_${DEFAULT_CREATOR_UID}`,
+        userId: DEFAULT_CREATOR_UID,
+        plan: "FREE",
+        status: "FREE",
+        startDate: now,
+        endDate: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      db.credit_transactions[`tx_welcome_${DEFAULT_CREATOR_UID}`] = {
+        id: `tx_welcome_${DEFAULT_CREATOR_UID}`,
+        userId: DEFAULT_CREATOR_UID,
+        type: "BONUS",
+        amount: 5,
+        feature: "Bonus Registrasi Akun",
+        description: "Selamat datang di ARVIN STUDIO! 5 kredit awal akun kreator.",
+        createdAt: now,
+      };
+
+      saveDatabase(db);
+    }
+
+    return db;
   } catch (err) {
     console.error("[Firestore DB] Error reading DB file:", err);
-    return { content_plans: {}, ai_usage: {}, ai_history: {} };
+    return {
+      content_plans: {},
+      ai_usage: {},
+      ai_history: {},
+      users: {},
+      subscriptions: {},
+      credit_transactions: {},
+      daily_usage: {},
+    };
   }
 }
 
@@ -1613,6 +1677,854 @@ Pastikan menghasilkan tepat ${requestedCount} hashtag yang terdistribusi ke dala
       error: err?.message || "Maaf, permintaan belum berhasil diproses. Silakan coba lagi.",
     });
   }
+});
+
+
+
+// ==========================================
+// ENDPOINT: CONTENT PLANS (Tahap 7)
+// ==========================================
+app.get("/api/content-plans", (req: Request, res: Response): void => {
+  const userId = (req.headers["x-user-id"] || req.query.userId) as string;
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const db = getDatabase();
+  const allPlans = Object.values(db.content_plans || {});
+  const userPlans = allPlans
+    .filter((p: any) => p && p.userId === userId)
+    .sort((a: any, b: any) => {
+      const dateA = a.scheduledDate || a.createdAt || "";
+      const dateB = b.scheduledDate || b.createdAt || "";
+      return dateA.localeCompare(dateB);
+    });
+
+  res.json({ plans: userPlans });
+});
+
+app.post("/api/content-plans", (req: Request, res: Response): void => {
+  const userId = (req.headers["x-user-id"] || req.body.userId) as string;
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const {
+    title,
+    topic,
+    platform = "Instagram",
+    format = "Post",
+    scheduledDate,
+    scheduledTime = "10:00",
+    status = "Draft",
+    notes = "",
+  } = req.body || {};
+
+  if (!title || typeof title !== "string" || !title.trim()) {
+    res.status(400).json({ error: "Judul konten wajib diisi." });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const id = `plan_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const newPlan = {
+    id,
+    userId,
+    title: title.trim(),
+    topic: String(topic || "").trim(),
+    platform,
+    format,
+    scheduledDate: scheduledDate || now.split("T")[0],
+    scheduledTime,
+    status,
+    notes: String(notes || "").trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const db = getDatabase();
+  db.content_plans[id] = newPlan;
+  saveDatabase(db);
+
+  res.status(201).json({ plan: newPlan });
+});
+
+app.put("/api/content-plans/:id", (req: Request, res: Response): void => {
+  const { id } = req.params;
+  const userId = (req.headers["x-user-id"] || req.body.userId) as string;
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const db = getDatabase();
+  const existing = db.content_plans[id];
+  if (!existing) {
+    res.status(404).json({ error: "Rencana konten tidak ditemukan." });
+    return;
+  }
+
+  if (existing.userId !== userId) {
+    res.status(403).json({ error: "Akses ditolak. Dokumen bukan milik Anda." });
+    return;
+  }
+
+  const {
+    title,
+    topic,
+    platform,
+    format,
+    scheduledDate,
+    scheduledTime,
+    status,
+    notes,
+  } = req.body || {};
+
+  const updatedPlan = {
+    ...existing,
+    ...(title !== undefined && { title: String(title).trim() }),
+    ...(topic !== undefined && { topic: String(topic).trim() }),
+    ...(platform !== undefined && { platform }),
+    ...(format !== undefined && { format }),
+    ...(scheduledDate !== undefined && { scheduledDate }),
+    ...(scheduledTime !== undefined && { scheduledTime }),
+    ...(status !== undefined && { status }),
+    ...(notes !== undefined && { notes: String(notes).trim() }),
+    updatedAt: new Date().toISOString(),
+  };
+
+  db.content_plans[id] = updatedPlan;
+  saveDatabase(db);
+
+  res.json({ plan: updatedPlan });
+});
+
+app.delete("/api/content-plans/:id", (req: Request, res: Response): void => {
+  const { id } = req.params;
+  const userId = (req.headers["x-user-id"] || req.query.userId) as string;
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const db = getDatabase();
+  const existing = db.content_plans[id];
+  if (!existing) {
+    res.status(404).json({ error: "Rencana konten tidak ditemukan." });
+    return;
+  }
+
+  if (existing.userId !== userId) {
+    res.status(403).json({ error: "Akses ditolak. Dokumen bukan milik Anda." });
+    return;
+  }
+
+  delete db.content_plans[id];
+  saveDatabase(db);
+
+  res.json({ success: true, message: "Rencana konten berhasil dihapus." });
+});
+
+// ==========================================
+// ENDPOINT: AI USAGE (Tahap 7)
+// ==========================================
+app.post("/api/ai-usage", (req: Request, res: Response): void => {
+  const userId = (req.headers["x-user-id"] || req.body.userId) as string;
+  const { feature } = req.body || {};
+  if (!userId || !feature) {
+    res.status(400).json({ error: "userId dan feature wajib disertakan." });
+    return;
+  }
+
+  logAiUsage(userId, String(feature).trim());
+  res.status(201).json({ success: true });
+});
+
+// ==========================================
+// ENDPOINT: AI HISTORY (Tahap 7)
+// ==========================================
+app.get("/api/history", (req: Request, res: Response): void => {
+  const userId = (req.headers["x-user-id"] || req.query.userId) as string;
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const { category, search } = req.query as { category?: string; search?: string };
+  const db = getDatabase();
+  const allHistory = Object.values(db.ai_history || {});
+
+  let userHistory = allHistory.filter((item: any) => item && item.userId === userId);
+
+  if (category && category !== "All" && category !== "Semua") {
+    userHistory = userHistory.filter(
+      (item: any) => item.feature && item.feature.toLowerCase() === category.toLowerCase()
+    );
+  }
+
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    userHistory = userHistory.filter((item: any) => {
+      const t = (item.title || "").toLowerCase();
+      const f = (item.feature || "").toLowerCase();
+      const s = (item.inputSummary || "").toLowerCase();
+      return t.includes(q) || f.includes(q) || s.includes(q);
+    });
+  }
+
+  userHistory.sort((a: any, b: any) => {
+    const dateA = new Date(a.createdAt || 0).getTime();
+    const dateB = new Date(b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+
+  res.json({ history: userHistory });
+});
+
+app.post("/api/history", (req: Request, res: Response): void => {
+  const userId = (req.headers["x-user-id"] || req.body.userId) as string;
+  const { feature, title, inputSummary = "", result } = req.body || {};
+
+  if (!userId || !feature || !title) {
+    res.status(400).json({ error: "userId, feature, dan title wajib diisi." });
+    return;
+  }
+
+  const resultStr = typeof result === "string" ? result : JSON.stringify(result);
+  logAiHistory(userId, String(feature).trim(), String(title).trim(), String(inputSummary).trim(), resultStr);
+  logAiUsage(userId, String(feature).trim());
+
+  const db = getDatabase();
+  const recentHistories = Object.values(db.ai_history)
+    .filter((h: any) => h.userId === userId)
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  res.status(201).json({ item: recentHistories[0] || null });
+});
+
+app.delete("/api/history/:id", (req: Request, res: Response): void => {
+  const { id } = req.params;
+  const userId = (req.headers["x-user-id"] || req.query.userId) as string;
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const db = getDatabase();
+  const existing = db.ai_history[id];
+  if (!existing) {
+    res.status(404).json({ error: "Riwayat tidak ditemukan." });
+    return;
+  }
+
+  if (existing.userId !== userId) {
+    res.status(403).json({ error: "Akses ditolak. Dokumen bukan milik Anda." });
+    return;
+  }
+
+  delete db.ai_history[id];
+  saveDatabase(db);
+
+  res.json({ success: true, message: "Riwayat berhasil dihapus." });
+});
+
+// ==========================================
+// ENDPOINT: ANALYTICS (Tahap 7)
+// ==========================================
+app.get("/api/analytics", (req: Request, res: Response): void => {
+  const userId = (req.headers["x-user-id"] || req.query.userId) as string;
+  const period = (req.query.period as string) || "all";
+
+  if (!userId) {
+    res.status(400).json({ error: "User ID diperlukan." });
+    return;
+  }
+
+  const db = getDatabase();
+  const allPlans = Object.values(db.content_plans || {}).filter(
+    (p: any) => p && p.userId === userId
+  );
+  const allUsage = Object.values(db.ai_usage || {}).filter(
+    (u: any) => u && u.userId === userId
+  );
+
+  const now = new Date();
+  let cutoffTime = 0;
+  if (period === "7d") {
+    cutoffTime = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+  } else if (period === "30d") {
+    cutoffTime = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+  } else if (period === "90d") {
+    cutoffTime = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+  }
+
+  const filteredPlans = allPlans.filter((p: any) => {
+    if (cutoffTime === 0) return true;
+    const planTime = new Date(p.scheduledDate || p.createdAt || 0).getTime();
+    return planTime >= cutoffTime;
+  });
+
+  const filteredUsage = allUsage.filter((u: any) => {
+    if (cutoffTime === 0) return true;
+    const usageTime = new Date(u.createdAt || 0).getTime();
+    return usageTime >= cutoffTime;
+  });
+
+  const totalContent = filteredPlans.length;
+  let scheduled = 0;
+  let published = 0;
+  let draft = 0;
+  let cancelled = 0;
+
+  const platformDistribution = {
+    Facebook: 0,
+    Instagram: 0,
+    TikTok: 0,
+    YouTube: 0,
+    X: 0,
+    Other: 0,
+  };
+
+  filteredPlans.forEach((plan: any) => {
+    const st = String(plan.status || "").toLowerCase();
+    if (st === "scheduled" || st === "siap diposting") {
+      scheduled++;
+    } else if (st === "published" || st === "diposting") {
+      published++;
+    } else if (st === "draft" || st === "ide") {
+      draft++;
+    } else if (st === "cancelled" || st === "ditunda") {
+      cancelled++;
+    } else {
+      draft++;
+    }
+
+    const pf = String(plan.platform || "").trim();
+    if (pf === "Facebook") platformDistribution.Facebook++;
+    else if (pf === "Instagram") platformDistribution.Instagram++;
+    else if (pf === "TikTok") platformDistribution.TikTok++;
+    else if (pf === "YouTube") platformDistribution.YouTube++;
+    else if (pf === "X") platformDistribution.X++;
+    else platformDistribution.Other++;
+  });
+
+  const aiFeatureBreakdown: Record<string, number> = {
+    "Content Analyzer": 0,
+    "Content Ideas": 0,
+    "Caption Maker": 0,
+    "Hook Generator": 0,
+    "Script Maker": 0,
+    "Hashtag Generator": 0,
+  };
+
+  filteredUsage.forEach((u: any) => {
+    const featureName = String(u.feature || "Lainnya").trim();
+    if (aiFeatureBreakdown[featureName] !== undefined) {
+      aiFeatureBreakdown[featureName]++;
+    } else {
+      aiFeatureBreakdown[featureName] = 1;
+    }
+  });
+
+  const daysCount = period === "7d" ? 7 : period === "30d" ? 14 : 7;
+  const dailyActivity: Array<{ date: string; plans: number; ai: number }> = [];
+
+  for (let i = daysCount - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = d.toISOString().split("T")[0];
+    const plansOnDay = filteredPlans.filter((p: any) => {
+      const pDate = (p.scheduledDate || p.createdAt || "").split("T")[0];
+      return pDate === dateStr;
+    }).length;
+    const aiOnDay = filteredUsage.filter((u: any) => {
+      const uDate = (u.createdAt || "").split("T")[0];
+      return uDate === dateStr;
+    }).length;
+
+    dailyActivity.push({
+      date: dateStr,
+      plans: plansOnDay,
+      ai: aiOnDay,
+    });
+  }
+
+  const summary = {
+    period,
+    totalContent,
+    scheduled,
+    published,
+    draft,
+    cancelled,
+    platformDistribution,
+    totalAiGenerations: filteredUsage.length,
+    aiFeatureBreakdown,
+    dailyActivity,
+    totalContentPlans: totalContent,
+    contentDiposting: published,
+    contentDraft: draft,
+    contentSiapDiposting: scheduled,
+    contentIde: draft,
+    contentDitunda: cancelled,
+  };
+
+  res.json({ summary });
+});
+
+// ====================================================
+// TAHAP 8: ACCOUNT, PROFILE, PREMIUM, CREDITS, USAGE
+// ====================================================
+
+const AI_FEATURE_KEYS = [
+  "chat",
+  "content-analyzer",
+  "content-ideas",
+  "caption-maker",
+  "hook-generator",
+  "script-maker",
+  "hashtag-generator",
+] as const;
+
+const AI_FEATURE_LABELS: Record<string, string> = {
+  chat: "Chat AI",
+  "content-analyzer": "Content Analyzer",
+  "content-ideas": "Content Ideas",
+  "caption-maker": "Caption Maker",
+  "hook-generator": "Hook Generator",
+  "script-maker": "Script Maker",
+  "hashtag-generator": "Hashtag Generator",
+};
+
+const FREE_DAILY_LIMIT_PER_FEATURE = 5;
+
+function getTodayString(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function resolveUserAndSubscription(db: FirestoreMockDb, userId: string) {
+  let user = db.users[userId];
+  const now = new Date().toISOString();
+  if (!user) {
+    user = {
+      id: userId,
+      email: userId === DEFAULT_CREATOR_UID ? DEFAULT_CREATOR_EMAIL : `${userId}@arvinstudio.id`,
+      displayName: userId === DEFAULT_CREATOR_UID ? "Agnesya Kartika" : "Kreator ARVIN",
+      username: userId === DEFAULT_CREATOR_UID ? "agnesyakartika" : `creator_${userId.substring(0, 6)}`,
+      photoURL: "",
+      bio: "Digital Content Creator",
+      credits: 5,
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.users[userId] = user;
+
+    db.credit_transactions[`tx_init_${userId}`] = {
+      id: `tx_init_${userId}`,
+      userId,
+      type: "BONUS",
+      amount: 5,
+      feature: "Bonus Registrasi",
+      description: "Kredit selamat datang untuk pengguna baru ARVIN STUDIO",
+      createdAt: now,
+    };
+  }
+
+  let sub = db.subscriptions[`sub_${userId}`];
+  if (!sub) {
+    sub = {
+      id: `sub_${userId}`,
+      userId,
+      plan: "FREE",
+      status: "FREE",
+      startDate: now,
+      endDate: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.subscriptions[`sub_${userId}`] = sub;
+  }
+
+  // Check if subscription has expired
+  if (sub.status === "PREMIUM_ACTIVE" && sub.endDate) {
+    const endMs = new Date(sub.endDate).getTime();
+    if (Date.now() > endMs) {
+      sub.status = "PREMIUM_EXPIRED";
+      sub.updatedAt = now;
+      db.subscriptions[`sub_${userId}`] = sub;
+    }
+  }
+
+  return { user, sub };
+}
+
+function getDailyUsageMap(db: FirestoreMockDb, userId: string, dateStr: string) {
+  const map: Record<string, { count: number; limit: number; remaining: number; featureLabel: string }> = {};
+  for (const feat of AI_FEATURE_KEYS) {
+    const usageId = `${userId}_${dateStr}_${feat}`;
+    const rec = db.daily_usage[usageId];
+    const count = rec ? rec.count || 0 : 0;
+    map[feat] = {
+      count,
+      limit: FREE_DAILY_LIMIT_PER_FEATURE,
+      remaining: Math.max(0, FREE_DAILY_LIMIT_PER_FEATURE - count),
+      featureLabel: AI_FEATURE_LABELS[feat] || feat,
+    };
+  }
+  return map;
+}
+
+// 1. GET /api/account
+app.get("/api/account", (req: Request, res: Response) => {
+  const userId = String(req.query.userId || DEFAULT_CREATOR_UID);
+  const db = getDatabase();
+  const { user, sub } = resolveUserAndSubscription(db, userId);
+
+  // Calculate credits used
+  const allTx = Object.values(db.credit_transactions || {}).filter(
+    (t: any) => t.userId === userId
+  );
+  const creditsUsed = allTx
+    .filter((t: any) => t.type === "USE")
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount || 0), 0);
+
+  const todayStr = getTodayString();
+  const dailyUsage = getDailyUsageMap(db, userId, todayStr);
+  const isPremium = sub.status === "PREMIUM_ACTIVE";
+
+  saveDatabase(db);
+  res.json({
+    user,
+    subscription: sub,
+    creditsBalance: user.credits || 0,
+    creditsUsed,
+    dailyUsage,
+    isPremium,
+  });
+});
+
+// 2. PUT /api/account/profile
+app.put("/api/account/profile", (req: Request, res: Response) => {
+  const { userId, displayName, username, bio, photoURL } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: "userId diperlukan" });
+  }
+
+  const db = getDatabase();
+  const { user } = resolveUserAndSubscription(db, userId);
+
+  if (displayName !== undefined) user.displayName = String(displayName).trim();
+  if (username !== undefined) {
+    const sanitizedUsername = String(username).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+    user.username = sanitizedUsername;
+  }
+  if (bio !== undefined) user.bio = String(bio).trim();
+  if (photoURL !== undefined) user.photoURL = String(photoURL).trim();
+  user.updatedAt = new Date().toISOString();
+
+  db.users[userId] = user;
+  saveDatabase(db);
+
+  res.json({ success: true, user });
+});
+
+// 3. GET /api/subscription
+app.get("/api/subscription", (req: Request, res: Response) => {
+  const userId = String(req.query.userId || DEFAULT_CREATOR_UID);
+  const db = getDatabase();
+  const { sub } = resolveUserAndSubscription(db, userId);
+  saveDatabase(db);
+  res.json({
+    subscription: sub,
+    isPremium: sub.status === "PREMIUM_ACTIVE",
+  });
+});
+
+// 4. POST /api/subscription/simulate
+app.post("/api/subscription/simulate", (req: Request, res: Response) => {
+  const { userId, plan, status } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: "userId diperlukan" });
+  }
+
+  const db = getDatabase();
+  const { sub } = resolveUserAndSubscription(db, userId);
+  const now = new Date();
+
+  if (status === "FREE" || plan === "FREE") {
+    sub.plan = "FREE";
+    sub.status = "FREE";
+    sub.endDate = null;
+  } else if (status === "PREMIUM_EXPIRED") {
+    sub.status = "PREMIUM_EXPIRED";
+    sub.plan = plan || sub.plan || "MONTHLY";
+    // Set endDate to yesterday
+    const past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    sub.endDate = past.toISOString();
+  } else if (status === "PREMIUM_ACTIVE" || !status) {
+    sub.status = "PREMIUM_ACTIVE";
+    sub.plan = plan || "MONTHLY";
+    sub.startDate = now.toISOString();
+
+    let durationDays = 30;
+    if (sub.plan === "WEEKLY") durationDays = 7;
+    else if (sub.plan === "MONTHLY") durationDays = 30;
+    else if (sub.plan === "YEARLY") durationDays = 365;
+
+    const future = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    sub.endDate = future.toISOString();
+  }
+
+  sub.updatedAt = now.toISOString();
+  db.subscriptions[`sub_${userId}`] = sub;
+  saveDatabase(db);
+
+  res.json({ success: true, subscription: sub, isPremium: sub.status === "PREMIUM_ACTIVE" });
+});
+
+// 5. GET /api/credits
+app.get("/api/credits", (req: Request, res: Response) => {
+  const userId = String(req.query.userId || DEFAULT_CREATOR_UID);
+  const db = getDatabase();
+  const { user } = resolveUserAndSubscription(db, userId);
+
+  const allTx = Object.values(db.credit_transactions || {})
+    .filter((t: any) => t.userId === userId)
+    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const creditsUsed = allTx
+    .filter((t: any) => t.type === "USE")
+    .reduce((sum: number, t: any) => sum + Math.abs(t.amount || 0), 0);
+
+  saveDatabase(db);
+  res.json({
+    balance: user.credits || 0,
+    creditsUsed,
+    transactions: allTx,
+  });
+});
+
+// 6. POST /api/credits/transact
+app.post("/api/credits/transact", (req: Request, res: Response) => {
+  const { userId, type, amount, feature, description } = req.body;
+  if (!userId || !type || amount === undefined) {
+    return res.status(400).json({ error: "userId, type, and amount diperlukan" });
+  }
+
+  const db = getDatabase();
+  const { user } = resolveUserAndSubscription(db, userId);
+
+  const amt = Number(amount);
+  if (type === "USE" && (user.credits || 0) < Math.abs(amt)) {
+    return res.status(400).json({ error: "Saldo kredit tidak mencukupi" });
+  }
+
+  if (type === "USE") {
+    user.credits = Math.max(0, (user.credits || 0) - Math.abs(amt));
+  } else {
+    user.credits = (user.credits || 0) + Math.abs(amt);
+  }
+  user.updatedAt = new Date().toISOString();
+  db.users[userId] = user;
+
+  const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const tx = {
+    id: txId,
+    userId,
+    type,
+    amount: type === "USE" ? -Math.abs(amt) : Math.abs(amt),
+    feature: feature || "Penyesuaian Kredit",
+    description: description || "Transaksi kredit ARVIN STUDIO",
+    createdAt: new Date().toISOString(),
+  };
+
+  db.credit_transactions[txId] = tx;
+  saveDatabase(db);
+
+  res.json({ success: true, balance: user.credits, transaction: tx });
+});
+
+// 7. GET /api/usage-limit/status
+app.get("/api/usage-limit/status", (req: Request, res: Response) => {
+  const userId = String(req.query.userId || DEFAULT_CREATOR_UID);
+  const db = getDatabase();
+  const { sub } = resolveUserAndSubscription(db, userId);
+  const isPremium = sub.status === "PREMIUM_ACTIVE";
+  const todayStr = getTodayString();
+  const dailyUsage = getDailyUsageMap(db, userId, todayStr);
+
+  saveDatabase(db);
+  res.json({
+    isPremium,
+    subscriptionStatus: sub.status,
+    dailyUsage,
+  });
+});
+
+// 8. GET /api/usage-limit/check
+app.get("/api/usage-limit/check", (req: Request, res: Response) => {
+  const userId = String(req.query.userId || DEFAULT_CREATOR_UID);
+  const feature = String(req.query.feature || "").trim();
+
+  if (!feature) {
+    return res.status(400).json({ error: "feature diperlukan" });
+  }
+
+  const db = getDatabase();
+  const { sub } = resolveUserAndSubscription(db, userId);
+  const isPremium = sub.status === "PREMIUM_ACTIVE";
+
+  if (isPremium) {
+    saveDatabase(db);
+    return res.json({
+      allowed: true,
+      feature,
+      count: 0,
+      limit: 99999,
+      remaining: 99999,
+      isPremium: true,
+      reason: "ALLOWED",
+    });
+  }
+
+  const todayStr = getTodayString();
+  const usageId = `${userId}_${todayStr}_${feature}`;
+  const rec = db.daily_usage[usageId];
+  const count = rec ? rec.count || 0 : 0;
+  const limit = FREE_DAILY_LIMIT_PER_FEATURE;
+  const remaining = Math.max(0, limit - count);
+
+  saveDatabase(db);
+
+  if (count >= limit) {
+    return res.json({
+      allowed: false,
+      feature,
+      count,
+      limit,
+      remaining: 0,
+      isPremium: false,
+      reason: "DAILY_LIMIT_REACHED",
+    });
+  }
+
+  return res.json({
+    allowed: true,
+    feature,
+    count,
+    limit,
+    remaining,
+    isPremium: false,
+    reason: "ALLOWED",
+  });
+});
+
+// 9. POST /api/usage-limit/consume
+app.post("/api/usage-limit/consume", (req: Request, res: Response) => {
+  const { userId, feature } = req.body;
+  if (!userId || !feature) {
+    return res.status(400).json({ error: "userId dan feature diperlukan" });
+  }
+
+  const db = getDatabase();
+  const { sub } = resolveUserAndSubscription(db, userId);
+  const isPremium = sub.status === "PREMIUM_ACTIVE";
+
+  // For premium users, track usage for metrics but don't limit
+  const todayStr = getTodayString();
+  const usageId = `${userId}_${todayStr}_${feature}`;
+  const rec = db.daily_usage[usageId];
+  const currentCount = rec ? rec.count || 0 : 0;
+  const newCount = currentCount + 1;
+
+  db.daily_usage[usageId] = {
+    id: usageId,
+    userId,
+    date: todayStr,
+    feature,
+    count: newCount,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveDatabase(db);
+
+  res.json({
+    success: true,
+    feature,
+    count: newCount,
+    limit: isPremium ? 99999 : FREE_DAILY_LIMIT_PER_FEATURE,
+    remaining: isPremium ? 99999 : Math.max(0, FREE_DAILY_LIMIT_PER_FEATURE - newCount),
+    isPremium,
+  });
+});
+
+// 10. POST /api/auth/login
+app.post("/api/auth/login", (req: Request, res: Response) => {
+  const { email, displayName } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email diperlukan" });
+  }
+
+  const db = getDatabase();
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  // Find user by email or create
+  let user = Object.values(db.users || {}).find(
+    (u: any) => (u.email || "").toLowerCase() === cleanEmail
+  );
+
+  const now = new Date().toISOString();
+
+  if (!user) {
+    const userId = cleanEmail === DEFAULT_CREATOR_EMAIL
+      ? DEFAULT_CREATOR_UID
+      : `usr_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+
+    const derivedUsername = cleanEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+
+    user = {
+      id: userId,
+      email: cleanEmail,
+      displayName: displayName || derivedUsername || "Kreator ARVIN",
+      username: derivedUsername || `user_${userId.substring(0, 5)}`,
+      photoURL: "",
+      bio: "Digital Content Creator",
+      credits: 5,
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.users[userId] = user;
+
+    db.subscriptions[`sub_${userId}`] = {
+      id: `sub_${userId}`,
+      userId,
+      plan: "FREE",
+      status: "FREE",
+      startDate: now,
+      endDate: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    db.credit_transactions[`tx_init_${userId}`] = {
+      id: `tx_init_${userId}`,
+      userId,
+      type: "BONUS",
+      amount: 5,
+      feature: "Bonus Registrasi",
+      description: "Kredit selamat datang untuk pengguna baru ARVIN STUDIO",
+      createdAt: now,
+    };
+  }
+
+  const sub = db.subscriptions[`sub_${user.id}`];
+  saveDatabase(db);
+
+  res.json({
+    success: true,
+    user,
+    subscription: sub,
+  });
 });
 
 

@@ -1,128 +1,91 @@
 import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+} from 'firebase/firestore';
+import { auth, db } from './firebase';
+import {
   ContentPlan,
-  ContentPlanStatus,
-  AiUsageRecord,
   AiHistoryItem,
   AnalyticsPeriod,
   AnalyticsSummary,
+  PlatformDistribution,
 } from '../types';
 
-const STORAGE_KEYS = {
-  USER_ID: 'arvin_user_id',
-  CONTENT_PLANS: 'arvin_content_plans',
-  AI_USAGE: 'arvin_ai_usage',
-  AI_HISTORY: 'arvin_ai_history',
-};
-
-/**
- * Returns the stable user ID for this browser session.
- * Uses persistent unique user identifier per device / browser.
- */
 export function getUserId(): string {
-  try {
-    let uid = localStorage.getItem(STORAGE_KEYS.USER_ID);
-    if (!uid) {
-      uid = 'usr_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
-      localStorage.setItem(STORAGE_KEYS.USER_ID, uid);
-    }
-    return uid;
-  } catch {
-    return 'usr_default_creator';
-  }
+  return auth.currentUser?.uid || '';
 }
 
 // ----------------------------------------------------
-// CONTENT PLANS CRUD
+// CONTENT PLANS CRUD (FIRESTORE)
 // ----------------------------------------------------
 
 export async function fetchContentPlans(): Promise<ContentPlan[]> {
-  const userId = getUserId();
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
+
   try {
-    const response = await fetch(`/api/content-plans?userId=${encodeURIComponent(userId)}`, {
-      headers: {
-        'x-user-id': userId,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Data belum dapat dimuat. Silakan coba lagi.');
-    }
-
-    const data = await response.json();
-    return Array.isArray(data.plans) ? data.plans : [];
+    const q = query(
+      collection(db, 'content_plans'),
+      where('userId', '==', uid)
+    );
+    const snap = await getDocs(q);
+    const list: ContentPlan[] = snap.docs.map((d) => d.data() as ContentPlan);
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
-    console.warn('Network error fetching content plans, checking local cache:', error);
-    // Fallback to local storage
-    try {
-      const cached = localStorage.getItem(STORAGE_KEYS.CONTENT_PLANS);
-      if (cached) {
-        const all: ContentPlan[] = JSON.parse(cached);
-        return all.filter((p) => p.userId === userId);
-      }
-    } catch {
-      // ignore
-    }
-    throw new Error('Data belum dapat dimuat. Silakan coba lagi.');
+    console.error('Error fetching content plans from Firestore:', error);
+    return [];
   }
 }
 
 export async function createContentPlan(
   data: Omit<ContentPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
 ): Promise<ContentPlan> {
-  const userId = getUserId();
-  try {
-    const response = await fetch('/api/content-plans', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
-      body: JSON.stringify({
-        ...data,
-        userId,
-      }),
-    });
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Pengguna belum login.');
 
-    if (!response.ok) {
-      throw new Error('Data belum berhasil disimpan.');
-    }
+  const planId = `plan_${uid}_${Date.now()}`;
+  const now = new Date().toISOString();
 
-    const res = await response.json();
-    return res.plan;
-  } catch (error) {
-    console.error('Error creating content plan:', error);
-    throw new Error('Data belum berhasil disimpan.');
-  }
+  const newPlan: ContentPlan = {
+    ...data,
+    id: planId,
+    userId: uid,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await setDoc(doc(db, 'content_plans', planId), newPlan);
+  return newPlan;
 }
 
 export async function updateContentPlan(
   id: string,
   updates: Partial<ContentPlan>
 ): Promise<ContentPlan> {
-  const userId = getUserId();
-  try {
-    const response = await fetch(`/api/content-plans/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
-      body: JSON.stringify({
-        ...updates,
-        userId,
-      }),
-    });
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Pengguna belum login.');
 
-    if (!response.ok) {
-      throw new Error('Data belum berhasil disimpan.');
-    }
+  const planRef = doc(db, 'content_plans', id);
+  const now = new Date().toISOString();
 
-    const res = await response.json();
-    return res.plan;
-  } catch (error) {
-    console.error('Error updating content plan:', error);
-    throw new Error('Data belum berhasil disimpan.');
-  }
+  await updateDoc(planRef, {
+    ...updates,
+    updatedAt: now,
+  });
+
+  const updatedPlan: ContentPlan = {
+    ...(updates as any),
+    id,
+    userId: uid,
+    updatedAt: now,
+  };
+  return updatedPlan;
 }
 
 export async function markContentPlanAsPosted(id: string): Promise<ContentPlan> {
@@ -130,165 +93,253 @@ export async function markContentPlanAsPosted(id: string): Promise<ContentPlan> 
 }
 
 export async function deleteContentPlan(id: string): Promise<void> {
-  const userId = getUserId();
-  try {
-    const response = await fetch(`/api/content-plans/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'x-user-id': userId,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Data belum berhasil dihapus.');
-    }
-  } catch (error) {
-    console.error('Error deleting content plan:', error);
-    throw new Error('Data belum berhasil dihapus.');
-  }
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Pengguna belum login.');
+  await deleteDoc(doc(db, 'content_plans', id));
 }
 
 // ----------------------------------------------------
-// ANALYTICS
+// ANALYTICS (FIRESTORE AGGREGATION)
 // ----------------------------------------------------
 
 export async function fetchAnalytics(period: AnalyticsPeriod = 'all'): Promise<AnalyticsSummary> {
-  const userId = getUserId();
-  try {
-    const response = await fetch(
-      `/api/analytics?userId=${encodeURIComponent(userId)}&period=${encodeURIComponent(period)}`,
-      {
-        headers: {
-          'x-user-id': userId,
-        },
-      }
-    );
+  const uid = auth.currentUser?.uid;
+  const defaultEmptySummary: AnalyticsSummary = {
+    period,
+    totalContent: 0,
+    scheduled: 0,
+    published: 0,
+    draft: 0,
+    cancelled: 0,
+    platformDistribution: {
+      Facebook: 0,
+      Instagram: 0,
+      TikTok: 0,
+      YouTube: 0,
+      X: 0,
+      Other: 0,
+    },
+    totalAiGenerations: 0,
+    aiFeatureBreakdown: {},
+    dailyActivity: [],
+    totalGenerated: 0,
+    totalContentPlans: 0,
+    plansByStatus: { Draft: 0, Scheduled: 0, Published: 0, Cancelled: 0 },
+    toolUsageStats: [],
+    dailyUsageTrend: [],
+  };
 
-    if (!response.ok) {
-      throw new Error('Data belum dapat dimuat. Silakan coba lagi.');
+  if (!uid) {
+    return defaultEmptySummary;
+  }
+
+  try {
+    // 1. Fetch content plans
+    const plansSnap = await getDocs(query(collection(db, 'content_plans'), where('userId', '==', uid)));
+    const plans = plansSnap.docs.map((d) => d.data() as ContentPlan);
+
+    // 2. Fetch history
+    const historySnap = await getDocs(query(collection(db, 'ai_history'), where('userId', '==', uid)));
+    const history = historySnap.docs.map((d) => d.data() as AiHistoryItem);
+
+    // Filter by period
+    const now = new Date();
+    let cutoff = 0;
+    if (period === '7d') {
+      cutoff = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    } else if (period === '30d') {
+      cutoff = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    } else if (period === '90d') {
+      cutoff = now.getTime() - 90 * 24 * 60 * 60 * 1000;
     }
 
-    const data = await response.json();
-    return data.summary;
+    const filteredPlans = cutoff > 0 ? plans.filter((p) => new Date(p.createdAt).getTime() >= cutoff) : plans;
+    const filteredHistory = cutoff > 0 ? history.filter((h) => new Date(h.createdAt).getTime() >= cutoff) : history;
+
+    // Plans by status
+    const plansByStatus = {
+      Draft: 0,
+      Scheduled: 0,
+      Published: 0,
+      Cancelled: 0,
+    };
+
+    const platformDistribution: PlatformDistribution = {
+      Facebook: 0,
+      Instagram: 0,
+      TikTok: 0,
+      YouTube: 0,
+      X: 0,
+      Other: 0,
+    };
+
+    for (const p of filteredPlans) {
+      if (p.status === 'Diposting' || p.status === 'Published') plansByStatus.Published++;
+      else if (p.status === 'Siap Diposting' || p.status === 'Scheduled') plansByStatus.Scheduled++;
+      else if (p.status === 'Ditunda' || p.status === 'Cancelled') plansByStatus.Cancelled++;
+      else plansByStatus.Draft++;
+
+      if (p.platform in platformDistribution) {
+        platformDistribution[p.platform as keyof PlatformDistribution]++;
+      } else {
+        platformDistribution.Other++;
+      }
+    }
+
+    // Tool usage stats
+    const usageCounts: Record<string, number> = {};
+    for (const h of filteredHistory) {
+      const tool = h.feature || 'Lainnya';
+      usageCounts[tool] = (usageCounts[tool] || 0) + 1;
+    }
+
+    const toolUsageStats = Object.entries(usageCounts).map(([feature, count]) => ({
+      feature,
+      count,
+      percentage: filteredHistory.length > 0 ? Math.round((count / filteredHistory.length) * 100) : 0,
+    }));
+
+    // Daily trend
+    const dateCounts: Record<string, { plans: number; ai: number }> = {};
+    for (const p of filteredPlans) {
+      const d = p.createdAt ? p.createdAt.split('T')[0] : '';
+      if (d) {
+        if (!dateCounts[d]) dateCounts[d] = { plans: 0, ai: 0 };
+        dateCounts[d].plans++;
+      }
+    }
+    for (const h of filteredHistory) {
+      const d = h.createdAt ? h.createdAt.split('T')[0] : '';
+      if (d) {
+        if (!dateCounts[d]) dateCounts[d] = { plans: 0, ai: 0 };
+        dateCounts[d].ai++;
+      }
+    }
+
+    const dailyActivity = Object.entries(dateCounts)
+      .map(([date, val]) => ({ date, plans: val.plans, ai: val.ai }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-14);
+
+    const dailyUsageTrend = Object.entries(dateCounts)
+      .map(([date, val]) => ({ date, count: val.ai }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-7);
+
+    return {
+      period,
+      totalContent: filteredPlans.length,
+      scheduled: plansByStatus.Scheduled,
+      published: plansByStatus.Published,
+      draft: plansByStatus.Draft,
+      cancelled: plansByStatus.Cancelled,
+      platformDistribution,
+      totalAiGenerations: filteredHistory.length,
+      aiFeatureBreakdown: usageCounts,
+      dailyActivity,
+      totalGenerated: filteredHistory.length,
+      totalContentPlans: filteredPlans.length,
+      plansByStatus,
+      toolUsageStats,
+      dailyUsageTrend,
+    };
   } catch (error) {
-    console.error('Error fetching analytics:', error);
-    throw new Error('Data belum dapat dimuat. Silakan coba lagi.');
+    console.error('Error fetching analytics from Firestore:', error);
+    return defaultEmptySummary;
   }
 }
 
 // ----------------------------------------------------
-// AI USAGE TRACKING
+// AI USAGE TRACKING & HISTORY (FIRESTORE)
 // ----------------------------------------------------
 
 let lastUsageLogTime: Record<string, number> = {};
 
 export async function recordAiUsage(feature: string): Promise<void> {
-  const userId = getUserId();
-  const now = Date.now();
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
 
-  // Prevent duplicate records from double clicking within 2 seconds for the same feature
+  const now = Date.now();
   if (lastUsageLogTime[feature] && now - lastUsageLogTime[feature] < 2000) {
     return;
   }
   lastUsageLogTime[feature] = now;
 
   try {
-    await fetch('/api/ai-usage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
-      body: JSON.stringify({
-        userId,
-        feature,
-      }),
+    const usageId = `usage_${uid}_${Date.now()}`;
+    await setDoc(doc(db, 'ai_usage_logs', usageId), {
+      id: usageId,
+      userId: uid,
+      feature,
+      createdAt: new Date().toISOString(),
     });
-  } catch (error) {
-    console.warn('Failed to record AI usage:', error);
+  } catch (err) {
+    // Non-blocking log
   }
 }
-
-// ----------------------------------------------------
-// AI HISTORY
-// ----------------------------------------------------
 
 export async function fetchAiHistory(
   category?: string,
   search?: string
 ): Promise<AiHistoryItem[]> {
-  const userId = getUserId();
+  const uid = auth.currentUser?.uid;
+  if (!uid) return [];
+
   try {
-    const params = new URLSearchParams({ userId });
+    const q = query(
+      collection(db, 'ai_history'),
+      where('userId', '==', uid)
+    );
+    const snap = await getDocs(q);
+    let list: AiHistoryItem[] = snap.docs.map((d) => d.data() as AiHistoryItem);
+
     if (category && category !== 'Semua') {
-      params.append('category', category);
+      list = list.filter((item) => item.feature.toLowerCase() === category.toLowerCase());
     }
+
     if (search && search.trim()) {
-      params.append('search', search.trim());
+      const lower = search.toLowerCase();
+      list = list.filter(
+        (item) =>
+          item.title.toLowerCase().includes(lower) ||
+          item.inputSummary.toLowerCase().includes(lower) ||
+          item.result.toLowerCase().includes(lower)
+      );
     }
 
-    const response = await fetch(`/api/history?${params.toString()}`, {
-      headers: {
-        'x-user-id': userId,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Data belum dapat dimuat. Silakan coba lagi.');
-    }
-
-    const data = await response.json();
-    return Array.isArray(data.history) ? data.history : [];
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch (error) {
-    console.error('Error fetching history:', error);
-    throw new Error('Data belum dapat dimuat. Silakan coba lagi.');
+    console.error('Error fetching AI history from Firestore:', error);
+    return [];
   }
 }
 
 export async function saveAiHistory(
   item: Omit<AiHistoryItem, 'id' | 'userId' | 'createdAt'>
 ): Promise<AiHistoryItem | null> {
-  const userId = getUserId();
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+
   try {
-    const response = await fetch('/api/history', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
-      body: JSON.stringify({
-        ...item,
-        userId,
-      }),
-    });
+    const historyId = `hist_${uid}_${Date.now()}`;
+    const now = new Date().toISOString();
+    const fullItem: AiHistoryItem = {
+      ...item,
+      id: historyId,
+      userId: uid,
+      createdAt: now,
+    };
 
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    return data.item;
+    await setDoc(doc(db, 'ai_history', historyId), fullItem);
+    return fullItem;
   } catch (error) {
-    console.warn('Could not save to history:', error);
+    console.warn('Could not save AI history to Firestore:', error);
     return null;
   }
 }
 
 export async function deleteAiHistory(id: string): Promise<void> {
-  const userId = getUserId();
-  try {
-    const response = await fetch(`/api/history/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'x-user-id': userId,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Data belum berhasil dihapus.');
-    }
-  } catch (error) {
-    console.error('Error deleting history item:', error);
-    throw new Error('Data belum berhasil dihapus.');
-  }
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Pengguna belum login.');
+  await deleteDoc(doc(db, 'ai_history', id));
 }

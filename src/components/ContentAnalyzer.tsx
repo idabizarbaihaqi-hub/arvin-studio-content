@@ -3,8 +3,12 @@ import {
   PlatformType,
   ContentCategoryType,
   ContentAnalysisResult,
+  ActiveView,
 } from '../types';
 import { analyzeContent } from '../services/aiService';
+import { recordAiUsage, saveAiHistory } from '../services/storageService';
+import { canUseFeature, consumeFeatureUsage } from '../services/accessControlService';
+import { QuotaExceededModal } from './QuotaExceededModal';
 import {
   Copy,
   Check,
@@ -43,9 +47,10 @@ const CONTENT_TYPES: ContentCategoryType[] = [
 
 interface ContentAnalyzerProps {
   onBackToChat?: () => void;
+  onNavigate?: (view: ActiveView) => void;
 }
 
-export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat }) => {
+export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, onNavigate }) => {
   // Input form state
   const [content, setContent] = useState('');
   const [platform, setPlatform] = useState<PlatformType>('Umum');
@@ -56,6 +61,7 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat }
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [result, setResult] = useState<ContentAnalysisResult | null>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Copy feedback state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -72,6 +78,13 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat }
       return;
     }
 
+    // Check daily usage quota for FREE accounts (5x/day per tool)
+    const quotaCheck = await canUseFeature('content-analyzer');
+    if (!quotaCheck.allowed) {
+      setShowQuotaModal(true);
+      return;
+    }
+
     setValidationError(null);
     setApiError(null);
     setIsLoading(true);
@@ -83,6 +96,21 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat }
         contentType,
       });
       setResult(data);
+
+      // Record quota consumption only on success
+      await consumeFeatureUsage('content-analyzer');
+
+      try {
+        await recordAiUsage('Content Analyzer');
+        await saveAiHistory({
+          feature: 'Content Analyzer',
+          title: `Analisis ${contentType} (${platform})`,
+          inputSummary: trimmed.length > 80 ? trimmed.substring(0, 80) + '...' : trimmed,
+          result: `Skor: ${data.overallScore}/100\nEvaluasi: ${data.summary}\n\nKelebihan:\n${(data.strengths || []).join('\n')}\n\nPerbaikan:\n${(data.improvements || []).join('\n')}\n\nRekomendasi:\n${(data.recommendations || []).join('\n')}\n\nVersi Revisi:\n${data.improvedVersion || '-'}`,
+        });
+      } catch (saveErr) {
+        console.warn('Auto-save history error:', saveErr);
+      }
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -604,6 +632,17 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat }
           </div>
         </div>
       )}
+
+      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      <QuotaExceededModal
+        isOpen={showQuotaModal}
+        featureLabel="Content Analyzer"
+        onClose={() => setShowQuotaModal(false)}
+        onUpgrade={() => {
+          setShowQuotaModal(false);
+          onNavigate?.('premium');
+        }}
+      />
     </div>
   );
 };

@@ -69,22 +69,53 @@ export const Header: React.FC<HeaderProps> = ({
               Hashtag Generator
             </span>
           )}
+          {activeView === 'content-planner' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+              Content Planner
+            </span>
+          )}
+          {activeView === 'analytics' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+              Analytics
+            </span>
+          )}
+          {activeView === 'history' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+              History
+            </span>
+          )}
+          {activeView === 'account' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 shrink-0">
+              Dashboard Akun
+            </span>
+          )}
+          {activeView === 'profile' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 shrink-0">
+              Profil
+            </span>
+          )}
+          {activeView === 'premium' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+              Premium
+            </span>
+          )}
+          {activeView === 'credits' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+              Credits
+            </span>
+          )}
+          {activeView === 'settings' && (
+            <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+              Pengaturan
+            </span>
+          )}
         </div>
       </div>
 
       {/* Right: Status badge & More menu */}
       <div className="flex items-center gap-2">
         <div className="px-2.5 sm:px-3 py-0.5 sm:py-1 bg-emerald-50 text-[10px] sm:text-[11px] font-bold text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-wider">
-          {activeView === 'content-analyzer' ||
-          activeView === 'content-ideas' ||
-          activeView === 'caption-maker' ||
-          activeView === 'hook-generator' ||
-          activeView === 'script-maker' ||
-          activeView === 'hashtag-generator'
-            ? 'Aktif'
-            : hasMessages
-            ? 'Aktif'
-            : 'Online'}
+          {activeView !== 'chat' || hasMessages ? 'Aktif' : 'Online'}
         </div>
 
         <button

@@ -1,77 +1,163 @@
 {
   "entities": {
-    "ContentPlan": {
-      "title": "ContentPlan",
-      "description": "Perencanaan konten media sosial pengguna di ARVIN STUDIO",
+    "User": {
+      "title": "User",
+      "description": "Profil pengguna ARVIN STUDIO di collection users",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "ID unik rencana konten" },
-        "userId": { "type": "string", "description": "ID unik pemilik dokumen" },
-        "title": { "type": "string", "description": "Judul konten" },
-        "topic": { "type": "string", "description": "Topik bahasan konten" },
-        "platform": {
-          "type": "string",
-          "enum": ["Instagram", "TikTok", "Facebook", "YouTube", "X", "LinkedIn"],
-          "description": "Platform target publikasi"
-        },
-        "format": {
-          "type": "string",
-          "enum": ["Reels", "Video", "Carousel", "Image", "Story", "Short", "Long Video", "Text Post", "Artikel"],
-          "description": "Format konten"
-        },
-        "scheduledDate": { "type": "string", "description": "Tanggal publikasi terencana YYYY-MM-DD" },
-        "scheduledTime": { "type": "string", "description": "Waktu publikasi terencana HH:mm" },
-        "status": {
-          "type": "string",
-          "enum": ["Ide", "Draft", "Siap Diposting", "Diposting", "Ditunda"],
-          "description": "Status pengerjaan konten"
-        },
-        "notes": { "type": "string", "description": "Catatan tambahan atau arahan kreatif" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan data ISO" },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan data ISO" }
+        "id": { "type": "string", "description": "UID pengguna dari Firebase Auth" },
+        "uid": { "type": "string", "description": "UID pengguna dari Firebase Auth" },
+        "fullName": { "type": "string", "description": "Nama lengkap pengguna" },
+        "username": { "type": "string", "description": "Username unik kreator" },
+        "email": { "type": "string", "format": "email", "description": "Email terdaftar" },
+        "photoURL": { "type": "string", "description": "URL foto profil" },
+        "bio": { "type": "string", "description": "Biografi kreator" },
+        "role": { "type": "string", "enum": ["USER", "ADMIN"], "description": "Peran pengguna" },
+        "plan": { "type": "string", "enum": ["FREE", "PREMIUM"], "description": "Paket aktif" },
+        "subscriptionStatus": { "type": "string", "enum": ["INACTIVE", "ACTIVE"], "description": "Status langganan aktif atau tidak" },
+        "subscriptionExpiry": { "type": "string", "description": "Tanggal kedaluwarsa langganan premium ISO jika ada" },
+        "createdAt": { "type": "string", "description": "Waktu pendaftaran ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan profil ISO" }
       },
-      "required": ["id", "userId", "title", "topic", "platform", "format", "scheduledDate", "status", "createdAt", "updatedAt"]
+      "required": ["id", "uid", "fullName", "username", "email", "role", "plan", "subscriptionStatus", "createdAt", "updatedAt"]
+    },
+    "CreditTransaction": {
+      "title": "CreditTransaction",
+      "description": "Pencatatan riwayat transaksi kredit di collection credit_transactions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik transaksi" },
+        "userId": { "type": "string", "description": "UID pemilik kredit" },
+        "type": { "type": "string", "enum": ["EARN", "USE", "BONUS", "REFUND", "ADJUSTMENT"], "description": "Tipe transaksi" },
+        "amount": { "type": "number", "description": "Nilai perubahan kredit" },
+        "feature": { "type": "string", "description": "Nama fitur yang digunakan" },
+        "description": { "type": "string", "description": "Keterangan transaksi" },
+        "createdAt": { "type": "string", "description": "Waktu transaksi ISO" }
+      },
+      "required": ["id", "userId", "type", "amount", "feature", "description", "createdAt"]
     },
     "AiUsage": {
       "title": "AiUsage",
-      "description": "Catatan ringkas kuantitatif penggunaan fitur AI oleh pengguna",
+      "description": "Pencatatan kuota pemakaian harian per fitur di collection ai_usage",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "ID unik record penggunaan" },
-        "userId": { "type": "string", "description": "ID unik pengguna" },
-        "feature": { "type": "string", "description": "Nama fitur AI yang berhasil digunakan" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp ISO penggunaan" }
+        "id": { "type": "string", "description": "ID gabungan userId_feature_date" },
+        "userId": { "type": "string", "description": "UID pengguna" },
+        "feature": { "type": "string", "description": "Kunci fitur AI yang digunakan" },
+        "date": { "type": "string", "description": "Tanggal format YYYY-MM-DD" },
+        "usageCount": { "type": "number", "description": "Jumlah penggunaan fitur pada hari tersebut" },
+        "createdAt": { "type": "string", "description": "Waktu dibuat ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu diperbarui ISO" }
       },
-      "required": ["id", "userId", "feature", "createdAt"]
+      "required": ["id", "userId", "feature", "date", "usageCount", "createdAt", "updatedAt"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Pengajuan dan riwayat langganan pengguna di collection subscriptions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik langganan" },
+        "userId": { "type": "string", "description": "UID pengguna pemesan" },
+        "plan": { "type": "string", "description": "Nama paket: PREMIUM 7 HARI, PREMIUM 30 HARI, PREMIUM 12 BULAN" },
+        "price": { "type": "number", "description": "Harga paket dalam Rupiah" },
+        "duration": { "type": "string", "description": "Durasi paket (7 hari, 30 hari, 12 bulan)" },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING_PAYMENT", "PAYMENT_SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "EXPIRED"],
+          "description": "Status verifikasi pembayaran langganan"
+        },
+        "paymentProofUrl": { "type": "string", "description": "URL bukti transfer" },
+        "submittedAt": { "type": "string", "description": "Waktu unggah bukti pembayaran" },
+        "reviewedAt": { "type": "string", "description": "Waktu review oleh admin" },
+        "reviewedBy": { "type": "string", "description": "Admin peninjau" },
+        "rejectionReason": { "type": "string", "description": "Alasan jika ditolak" },
+        "startDate": { "type": "string", "description": "Tanggal mulai premium" },
+        "endDate": { "type": "string", "description": "Tanggal berakhir premium" },
+        "createdAt": { "type": "string", "description": "Waktu order dibuat ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" }
+      },
+      "required": ["id", "userId", "plan", "price", "duration", "status", "createdAt", "updatedAt"]
     },
     "AiHistory": {
       "title": "AiHistory",
-      "description": "Riwayat hasil generasi dan analisis AI yang pernah dibuat pengguna",
+      "description": "Riwayat hasil generator AI di collection ai_history",
       "type": "object",
       "properties": {
         "id": { "type": "string", "description": "ID unik riwayat" },
-        "userId": { "type": "string", "description": "ID unik pengguna pemilik riwayat" },
-        "feature": { "type": "string", "description": "Kategori fitur AI" },
-        "title": { "type": "string", "description": "Judul atau ringkasan topik riwayat" },
-        "inputSummary": { "type": "string", "description": "Ringkasan input yang dimasukkan pengguna" },
-        "result": { "type": "string", "description": "Hasil keluaran AI yang dihasilkan" },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp ISO waktu dibuat" }
+        "userId": { "type": "string", "description": "UID pemilik riwayat" },
+        "feature": { "type": "string", "description": "Fitur yang digunakan" },
+        "title": { "type": "string", "description": "Judul/topik riwayat" },
+        "inputSummary": { "type": "string", "description": "Ringkasan input" },
+        "result": { "type": "string", "description": "Hasil keluaran AI" },
+        "createdAt": { "type": "string", "description": "Waktu simpan ISO" }
       },
       "required": ["id", "userId", "feature", "title", "inputSummary", "result", "createdAt"]
+    },
+    "ContentPlan": {
+      "title": "ContentPlan",
+      "description": "Jadwal dan rencana konten di collection content_plans",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik konten" },
+        "userId": { "type": "string", "description": "UID pemilik konten" },
+        "title": { "type": "string", "description": "Judul konten" },
+        "topic": { "type": "string", "description": "Topik bahasan konten" },
+        "platform": { "type": "string", "description": "Platform publikasi" },
+        "format": { "type": "string", "description": "Format konten" },
+        "scheduledDate": { "type": "string", "description": "Tanggal publikasi YYYY-MM-DD" },
+        "scheduledTime": { "type": "string", "description": "Waktu publikasi HH:mm" },
+        "status": { "type": "string", "description": "Status pengerjaan konten" },
+        "notes": { "type": "string", "description": "Catatan arahan" },
+        "createdAt": { "type": "string", "description": "Waktu pembuatan ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" }
+      },
+      "required": ["id", "userId", "title", "topic", "platform", "format", "scheduledDate", "status", "createdAt", "updatedAt"]
+    },
+    "AdminActivityLog": {
+      "title": "AdminActivityLog",
+      "type": "object",
+      "description": "Log aktivitas operasional Super Admin",
+      "properties": {
+        "id": { "type": "string", "description": "ID log aktivitas" },
+        "adminId": { "type": "string", "description": "UID super admin" },
+        "adminEmail": { "type": "string", "description": "Email super admin" },
+        "action": { "type": "string", "description": "Jenis aksi (e.g. SUPER_ADMIN_APPROVED_PAYMENT)" },
+        "targetUserId": { "type": "string", "description": "UID user target jika ada" },
+        "targetSubscriptionId": { "type": "string", "description": "ID subscription target jika ada" },
+        "description": { "type": "string", "description": "Deskripsi aktivitas" },
+        "createdAt": { "type": "string", "description": "Waktu aktivitas ISO" }
+      },
+      "required": ["id", "adminId", "action", "description", "createdAt"]
     }
   },
   "firestore": {
-    "/content_plans/{planId}": {
-      "schema": { "$ref": "#/entities/ContentPlan" },
-      "description": "Collection rencana konten perorangan yang diisolasi berdasarkan userId"
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Data profil pengguna yang diisolasi per UID"
+    },
+    "/credit_transactions/{txId}": {
+      "schema": { "$ref": "#/entities/CreditTransaction" },
+      "description": "Transaksi perolehan dan penggunaan kredit akun"
     },
     "/ai_usage/{usageId}": {
       "schema": { "$ref": "#/entities/AiUsage" },
-      "description": "Collection pencatatan metrik penggunaan AI untuk analitik pengguna"
+      "description": "Pencatatan pemakaian harian fitur AI per user dan tanggal"
+    },
+    "/subscriptions/{subId}": {
+      "schema": { "$ref": "#/entities/Subscription" },
+      "description": "Pengajuan dan status langganan premium akun"
     },
     "/ai_history/{historyId}": {
       "schema": { "$ref": "#/entities/AiHistory" },
-      "description": "Collection arsip hasil AI pengguna yang dapat disalin atau dihapus"
+      "description": "Arsip riwayat hasil generasi AI pengguna"
+    },
+    "/content_plans/{planId}": {
+      "schema": { "$ref": "#/entities/ContentPlan" },
+      "description": "Perencanaan konten media sosial terisolasi per pengguna"
+    },
+    "/admin_activity_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminActivityLog" },
+      "description": "Arsip log aktivitas operasional Super Admin"
     }
   }
 }

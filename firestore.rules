@@ -12,62 +12,94 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Validation for content_plans
-    function isValidContentPlan(data) {
-      return data.userId is string &&
-             data.title is string && data.title.size() > 0 &&
-             data.topic is string &&
-             data.platform in ['Instagram', 'TikTok', 'Facebook', 'YouTube', 'X', 'LinkedIn'] &&
-             data.format in ['Reels', 'Video', 'Carousel', 'Image', 'Story', 'Short', 'Long Video', 'Text Post', 'Artikel'] &&
-             data.scheduledDate is string &&
-             data.status in ['Ide', 'Draft', 'Siap Diposting', 'Diposting', 'Ditunda'];
+    // Helper to check if current user is Super Admin
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'id.abizarbaihaqi@gmail.com' ||
+        request.auth.token.superAdmin == true ||
+        request.auth.token.role == 'SUPER_ADMIN'
+      );
     }
 
-    // Validation for ai_usage
-    function isValidAiUsage(data) {
-      return data.userId is string &&
-             data.feature is string && data.feature.size() > 0 &&
-             data.createdAt is string;
+    // Match users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSuperAdmin();
+      // Regular user creates as USER + FREE + INACTIVE; Primary Super Admin registers as SUPER_ADMIN
+      allow create: if isOwner(userId) && (
+        (request.auth.token.email == 'id.abizarbaihaqi@gmail.com' && request.resource.data.role == 'SUPER_ADMIN') ||
+        (request.resource.data.role == 'USER' && request.resource.data.plan == 'FREE' && request.resource.data.subscriptionStatus == 'INACTIVE')
+      );
+      // Super Admin can update user (e.g. approve subscription, adjust plan/credits); user can only update own profile fields
+      allow update: if isSuperAdmin() || (
+        isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.plan == resource.data.plan &&
+        request.resource.data.subscriptionStatus == resource.data.subscriptionStatus
+      );
+      // Primary Super Admin cannot be deleted
+      allow delete: if isSuperAdmin() && resource.data.email != 'id.abizarbaihaqi@gmail.com';
     }
 
-    // Validation for ai_history
-    function isValidAiHistory(data) {
-      return data.userId is string &&
-             data.feature is string &&
-             data.title is string && data.title.size() > 0 &&
-             data.inputSummary is string &&
-             data.result is string &&
-             data.createdAt is string;
+    // Match credit_transactions collection
+    match /credit_transactions/{txId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isOwner(request.resource.data.userId) || isSuperAdmin();
+      allow update, delete: if false; // Credit ledger entries are immutable
     }
 
-    // Match content_plans collection
-    match /content_plans/{planId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId) && isValidContentPlan(request.resource.data);
-      allow update: if isOwner(resource.data.userId) &&
-                       isOwner(request.resource.data.userId) &&
-                       isValidContentPlan(request.resource.data);
-      allow delete: if isOwner(resource.data.userId);
-    }
-
-    // Match ai_usage collection (append-only metrics)
+    // Match ai_usage collection (tracked per userId_feature_date)
     match /ai_usage/{usageId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId) && isValidAiUsage(request.resource.data);
-      allow update, delete: if false; // Usage logs are immutable
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow update: if isSuperAdmin() || (
+        isAuthenticated() && request.resource.data.userId == request.auth.uid &&
+        (resource == null || resource.data.userId == request.auth.uid)
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Match subscriptions collection
+    match /subscriptions/{subId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      // User can create subscription with PENDING_PAYMENT or PAYMENT_SUBMITTED; Super admin can create
+      allow create: if isOwner(request.resource.data.userId) || isSuperAdmin();
+      // Super Admin can approve/reject; user can only upload payment proof
+      allow update: if isSuperAdmin() || (
+        isOwner(resource.data.userId) &&
+        isOwner(request.resource.data.userId) &&
+        (request.resource.data.status == 'PAYMENT_SUBMITTED' || request.resource.data.status == resource.data.status)
+      );
+      allow delete: if isSuperAdmin();
     }
 
     // Match ai_history collection
     match /ai_history/{historyId} {
-      allow read: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId) && isValidAiHistory(request.resource.data);
-      allow update: if isOwner(resource.data.userId) &&
-                       isOwner(request.resource.data.userId) &&
-                       isValidAiHistory(request.resource.data);
-      allow delete: if isOwner(resource.data.userId);
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isOwner(request.resource.data.userId) || isSuperAdmin();
+      allow update, delete: if isOwner(resource.data.userId) || isSuperAdmin();
     }
 
-    // Deny all other unmapped paths
+    // Match content_plans collection
+    match /content_plans/{planId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isOwner(request.resource.data.userId) || isSuperAdmin();
+      allow update: if (isOwner(resource.data.userId) && isOwner(request.resource.data.userId)) || isSuperAdmin();
+      allow delete: if isOwner(resource.data.userId) || isSuperAdmin();
+    }
+
+    // Match admin_activity_logs collection
+    match /admin_activity_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update, delete: if false; // Audit logs are immutable
+    }
+
+    // Deny all other paths
     match /{document=**} {
       allow read, write: if false;
     }

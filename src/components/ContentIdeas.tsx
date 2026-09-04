@@ -5,11 +5,15 @@ import {
   IdeaStyle,
   IdeaCount,
   ContentIdeaItem,
+  ActiveView,
 } from '../types';
 import {
   generateContentIdeas,
   regenerateSingleIdea,
 } from '../services/aiService';
+import { recordAiUsage, saveAiHistory } from '../services/storageService';
+import { canUseFeature, consumeFeatureUsage } from '../services/accessControlService';
+import { QuotaExceededModal } from './QuotaExceededModal';
 import {
   ArrowLeft,
   Sparkles,
@@ -84,9 +88,10 @@ const POPULAR_AUDIENCES = [
 
 interface ContentIdeasProps {
   onBackToChat?: () => void;
+  onNavigate?: (view: ActiveView) => void;
 }
 
-export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat }) => {
+export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat, onNavigate }) => {
   // Form State
   const [niche, setNiche] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
@@ -100,6 +105,7 @@ export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<ContentIdeaItem[] | null>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Active Modals & Card State
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -112,6 +118,13 @@ export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat }) => {
     const trimmedNiche = niche.trim();
     if (!trimmedNiche) {
       setValidationError('Silakan isi niche atau topik terlebih dahulu.');
+      return;
+    }
+
+    // Check daily usage quota for FREE accounts (5x/day per tool)
+    const quotaCheck = await canUseFeature('content-ideas');
+    if (!quotaCheck.allowed) {
+      setShowQuotaModal(true);
       return;
     }
 
@@ -130,6 +143,26 @@ export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat }) => {
       });
 
       setIdeas(generated);
+
+      // Record quota consumption only on success
+      await consumeFeatureUsage('content-ideas');
+
+      try {
+        await recordAiUsage('Content Ideas');
+        await saveAiHistory({
+          feature: 'Content Ideas',
+          title: `Ide Konten: ${trimmedNiche}`,
+          inputSummary: `Niche: ${trimmedNiche} | Target: ${targetAudience.trim() || 'Umum'} | Platform: ${platform}`,
+          result: generated
+            .map(
+              (it, idx) =>
+                `${idx + 1}. [${it.format}] ${it.title}\nHook: ${it.hook}\nKonsep: ${it.concept}\nTarget: ${it.targetAudience}\nCTA: ${it.cta || '-'}`
+            )
+            .join('\n\n'),
+        });
+      } catch (saveErr) {
+        console.warn('Auto-save history error:', saveErr);
+      }
     } catch (err: unknown) {
       console.error('Error generating ideas:', err);
       const msg =
@@ -930,6 +963,17 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
           </div>
         </div>
       )}
+
+      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      <QuotaExceededModal
+        isOpen={showQuotaModal}
+        featureLabel="Content Ideas"
+        onClose={() => setShowQuotaModal(false)}
+        onUpgrade={() => {
+          setShowQuotaModal(false);
+          onNavigate?.('premium');
+        }}
+      />
     </div>
   );
 };

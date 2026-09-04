@@ -5,8 +5,12 @@ import {
   ScriptDuration,
   ScriptStyle,
   GenerateScriptResult,
+  ActiveView,
 } from '../types';
 import { generateScript } from '../services/aiService';
+import { recordAiUsage, saveAiHistory } from '../services/storageService';
+import { canUseFeature, consumeFeatureUsage } from '../services/accessControlService';
+import { QuotaExceededModal } from './QuotaExceededModal';
 import {
   ArrowLeft,
   Clapperboard,
@@ -71,9 +75,10 @@ const STYLES: ScriptStyle[] = [
 
 interface ScriptMakerProps {
   onBackToChat?: () => void;
+  onNavigate?: (view: ActiveView) => void;
 }
 
-export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat }) => {
+export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNavigate }) => {
   // Form input state
   const [topic, setTopic] = useState('');
   const [platform, setPlatform] = useState<ScriptPlatform>('TikTok');
@@ -88,6 +93,7 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat }) => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Result state
   const [result, setResult] = useState<GenerateScriptResult | null>(null);
@@ -142,6 +148,13 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat }) => {
       setRegenerateCounter(nextCount);
     }
 
+    // Check daily usage quota for FREE accounts (5x/day per tool)
+    const quotaCheck = await canUseFeature('script-maker');
+    if (!quotaCheck.allowed) {
+      setShowQuotaModal(true);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -158,6 +171,21 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat }) => {
 
       setResult(data);
       setIsFormVisible(false);
+
+      // Record quota consumption only on success
+      await consumeFeatureUsage('script-maker');
+
+      try {
+        await recordAiUsage('Script Maker');
+        await saveAiHistory({
+          feature: 'Script Maker',
+          title: data.title || `Naskah: ${trimmed.substring(0, 40)}`,
+          inputSummary: `Topik: ${trimmed.substring(0, 80)} | Platform: ${platform} | Durasi: ${duration}`,
+          result: `Judul: ${data.title}\nPlatform: ${data.platform} | Durasi: ${data.duration} | Skor: ${data.score}/100\nHook: ${data.hook || '-'}\n\nOpening:\n${data.opening}\n\nIsi Script:\n${data.body}\n\nCTA: ${data.cta}\nEnding: ${data.ending}`,
+        });
+      } catch (saveErr) {
+        console.warn('Auto-save history error:', saveErr);
+      }
     } catch (err: any) {
       console.error('Script generation error:', err);
       const msg = err?.message || 'Maaf, permintaan belum berhasil diproses. Silakan coba lagi.';
@@ -808,6 +836,17 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat }) => {
           </div>
         )}
       </div>
+
+      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      <QuotaExceededModal
+        isOpen={showQuotaModal}
+        featureLabel="Script Maker"
+        onClose={() => setShowQuotaModal(false)}
+        onUpgrade={() => {
+          setShowQuotaModal(false);
+          onNavigate?.('premium');
+        }}
+      />
     </div>
   );
 };

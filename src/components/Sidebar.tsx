@@ -10,6 +10,9 @@ interface SidebarProps {
   activeView: ActiveView;
   onSelectView: (view: ActiveView) => void;
   onSelectFeaturePlaceholder: (item: MenuItem) => void;
+  isSuperAdmin?: boolean;
+  onNavigateToAdmin?: () => void;
+  userName?: string;
 }
 
 export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
@@ -38,18 +41,19 @@ export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
   {
     category: 'MANAGEMENT',
     items: [
-      { id: 'content-planner', label: 'Content Planner', iconName: '📅' },
-      { id: 'analytics', label: 'Analytics', iconName: '📈' },
-      { id: 'history', label: 'History', iconName: '🕘' },
+      { id: 'content-planner', label: 'Content Planner', iconName: '📅', badge: 'Aktif' },
+      { id: 'analytics', label: 'Analytics', iconName: '📈', badge: 'Aktif' },
+      { id: 'history', label: 'History', iconName: '🕘', badge: 'Aktif' },
     ],
   },
   {
     category: 'ACCOUNT',
     items: [
-      { id: 'premium', label: 'Premium', iconName: '⭐' },
-      { id: 'credits', label: 'Credits', iconName: '💳' },
-      { id: 'profile', label: 'Profile', iconName: '👤' },
-      { id: 'settings', label: 'Settings', iconName: '⚙️' },
+      { id: 'account', label: 'Dashboard Akun', iconName: '📱', badge: 'Aktif' },
+      { id: 'profile', label: 'Profile', iconName: '👤', badge: 'Aktif' },
+      { id: 'premium', label: 'Premium', iconName: '⭐', badge: 'Aktif' },
+      { id: 'credits', label: 'Credits', iconName: '💳', badge: 'Aktif' },
+      { id: 'settings', label: 'Settings', iconName: '⚙️', badge: 'Aktif' },
     ],
   },
 ];
@@ -61,6 +65,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeView,
   onSelectView,
   onSelectFeaturePlaceholder,
+  isSuperAdmin,
+  onNavigateToAdmin,
+  userName,
 }) => {
   return (
     <>
@@ -124,6 +131,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const isHookGenerator = item.id === 'hook-generator';
                   const isScriptMaker = item.id === 'script-maker';
                   const isHashtagGenerator = item.id === 'hashtag-generator';
+                  const isContentPlanner = item.id === 'content-planner';
+                  const isAnalytics = item.id === 'analytics';
+                  const isHistory = item.id === 'history';
+                  const isAccount = item.id === 'account';
+                  const isProfile = item.id === 'profile';
+                  const isPremium = item.id === 'premium';
+                  const isCredits = item.id === 'credits';
+                  const isSettings = item.id === 'settings';
+
                   const isActive =
                     (isNewChat && activeView === 'chat') ||
                     (isContentAnalyzer && activeView === 'content-analyzer') ||
@@ -131,7 +147,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     (isCaptionMaker && activeView === 'caption-maker') ||
                     (isHookGenerator && activeView === 'hook-generator') ||
                     (isScriptMaker && activeView === 'script-maker') ||
-                    (isHashtagGenerator && activeView === 'hashtag-generator');
+                    (isHashtagGenerator && activeView === 'hashtag-generator') ||
+                    (isContentPlanner && activeView === 'content-planner') ||
+                    (isAnalytics && activeView === 'analytics') ||
+                    (isHistory && activeView === 'history') ||
+                    (isAccount && activeView === 'account') ||
+                    (isProfile && activeView === 'profile') ||
+                    (isPremium && activeView === 'premium') ||
+                    (isCredits && activeView === 'credits') ||
+                    (isSettings && activeView === 'settings');
 
                   return (
                     <button
@@ -159,6 +183,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onClose();
                         } else if (isHashtagGenerator) {
                           onSelectView('hashtag-generator');
+                          onClose();
+                        } else if (isContentPlanner) {
+                          onSelectView('content-planner');
+                          onClose();
+                        } else if (isAnalytics) {
+                          onSelectView('analytics');
+                          onClose();
+                        } else if (isHistory) {
+                          onSelectView('history');
+                          onClose();
+                        } else if (isAccount) {
+                          onSelectView('account');
+                          onClose();
+                        } else if (isProfile) {
+                          onSelectView('profile');
+                          onClose();
+                        } else if (isPremium) {
+                          onSelectView('premium');
+                          onClose();
+                        } else if (isCredits) {
+                          onSelectView('credits');
+                          onClose();
+                        } else if (isSettings) {
+                          onSelectView('settings');
                           onClose();
                         } else {
                           onSelectFeaturePlaceholder(item);
@@ -196,20 +244,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           ))}
+
+          {/* Super Admin Special Entry */}
+          {isSuperAdmin && (
+            <div className="pt-2 px-1">
+              <div className="px-3 pb-1.5 text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+                ADMINISTRASI SISTEM
+              </div>
+              <button
+                id="sidebar-super-admin-link"
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onNavigateToAdmin?.();
+                }}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🛡️</span>
+                  <span>Super Admin Panel</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-amber-600" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer Credit & Status Panel */}
         <div className="p-4 border-t border-slate-100 shrink-0">
-          <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs shrink-0">
-              AS
+          <button
+            type="button"
+            onClick={() => {
+              onSelectView('account');
+              onClose();
+            }}
+            className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl p-3 flex items-center gap-3 transition-colors text-left cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              {userName ? userName.slice(0, 2).toUpperCase() : 'AS'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate text-slate-800">Creator Studio</p>
-              <p className="text-[10px] text-slate-400">120 Credits • Tahap 1</p>
+              <p className="text-xs font-bold truncate text-slate-900">
+                {userName || 'Kreator ARVIN'}
+              </p>
+              <p className="text-[10px] text-slate-500 font-medium">
+                {isSuperAdmin ? 'Super Administrator' : 'Akun Kreator • Kelola'}
+              </p>
             </div>
-            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Online"></div>
-          </div>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          </button>
         </div>
       </aside>
     </>

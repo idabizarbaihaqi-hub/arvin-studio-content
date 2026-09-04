@@ -8,8 +8,12 @@ import {
   CaptionCta,
   CaptionVariant,
   GenerateCaptionResult,
+  ActiveView,
 } from '../types';
 import { generateCaptions } from '../services/aiService';
+import { recordAiUsage, saveAiHistory } from '../services/storageService';
+import { canUseFeature, consumeFeatureUsage } from '../services/accessControlService';
+import { QuotaExceededModal } from './QuotaExceededModal';
 import {
   ArrowLeft,
   Sparkles,
@@ -77,9 +81,10 @@ const CTAS: CaptionCta[] = [
 
 interface CaptionMakerProps {
   onBackToChat?: () => void;
+  onNavigate?: (view: ActiveView) => void;
 }
 
-export const CaptionMaker: React.FC<CaptionMakerProps> = ({ onBackToChat }) => {
+export const CaptionMaker: React.FC<CaptionMakerProps> = ({ onBackToChat, onNavigate }) => {
   // Form input state
   const [content, setContent] = useState('');
   const [platform, setPlatform] = useState<CaptionPlatform>('Instagram');
@@ -94,6 +99,7 @@ export const CaptionMaker: React.FC<CaptionMakerProps> = ({ onBackToChat }) => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Result state
   const [result, setResult] = useState<GenerateCaptionResult | null>(null);
@@ -152,6 +158,13 @@ export const CaptionMaker: React.FC<CaptionMakerProps> = ({ onBackToChat }) => {
       setRegenerateCounter(nextCount);
     }
 
+    // Check daily usage quota for FREE accounts (5x/day per tool)
+    const quotaCheck = await canUseFeature('caption-maker');
+    if (!quotaCheck.allowed) {
+      setShowQuotaModal(true);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -169,6 +182,30 @@ export const CaptionMaker: React.FC<CaptionMakerProps> = ({ onBackToChat }) => {
       setResult(data);
       setActiveVariantIndex(0);
       setIsFormVisible(false);
+
+      // Record quota consumption only on success
+      await consumeFeatureUsage('caption-maker');
+
+      try {
+        await recordAiUsage('Caption Maker');
+        await saveAiHistory({
+          feature: 'Caption Maker',
+          title: `Caption: ${trimmed.substring(0, 40)}${trimmed.length > 40 ? '...' : ''}`,
+          inputSummary: `Topik: ${trimmed.substring(0, 80)} | Platform: ${platform} | Gaya: ${style}`,
+          result:
+            data.variants
+              .map(
+                (v, i) =>
+                  `--- VARIASI ${i + 1} (${v.name}) ---\n${v.description}\n\n${v.caption}`
+              )
+              .join('\n\n') +
+            (data.hashtags?.length
+              ? `\n\nHashtags:\n${data.hashtags.join(' ')}`
+              : ''),
+        });
+      } catch (saveErr) {
+        console.warn('Auto-save history error:', saveErr);
+      }
     } catch (err: any) {
       console.error('Caption generation error:', err);
       const msg = err?.message || 'Maaf, caption belum berhasil dibuat. Silakan coba lagi.';
@@ -808,6 +845,17 @@ export const CaptionMaker: React.FC<CaptionMakerProps> = ({ onBackToChat }) => {
           </div>
         )}
       </div>
+
+      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      <QuotaExceededModal
+        isOpen={showQuotaModal}
+        featureLabel="Caption Maker"
+        onClose={() => setShowQuotaModal(false)}
+        onUpgrade={() => {
+          setShowQuotaModal(false);
+          onNavigate?.('premium');
+        }}
+      />
     </div>
   );
 };

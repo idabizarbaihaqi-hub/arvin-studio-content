@@ -1,12 +1,14 @@
 import React from 'react';
-import { X, Sparkles, RefreshCw, Info, CheckCircle2 } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Info, CheckCircle2, User, Settings as SettingsIcon } from 'lucide-react';
 import { AsLogo } from './AsLogo';
+import { ActiveView } from '../types';
 
 interface OptionsMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNewChat: () => void;
   messageCount: number;
+  onNavigate?: (view: ActiveView) => void;
 }
 
 export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
@@ -14,6 +16,7 @@ export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
   onClose,
   onNewChat,
   messageCount,
+  onNavigate,
 }) => {
   if (!isOpen) return null;
 
@@ -56,6 +59,34 @@ export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
             <span>Mulai Chat Baru</span>
           </button>
 
+          {onNavigate && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('account');
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-slate-800 hover:bg-slate-100 transition-colors text-left"
+              >
+                <User className="w-4 h-4 text-slate-600" />
+                <span>Dashboard Akun</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate('settings');
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium text-slate-800 hover:bg-slate-100 transition-colors text-left"
+              >
+                <SettingsIcon className="w-4 h-4 text-slate-600" />
+                <span>Pengaturan</span>
+              </button>
+            </>
+          )}
+
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-2 mt-2">
             <div className="flex items-center justify-between text-slate-500">
               <span className="flex items-center gap-1.5">
@@ -78,7 +109,7 @@ export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
         </div>
 
         <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400 text-center">
-          ARVIN STUDIO v1.0 • Tahap 1 Mobile-First
+          ARVIN STUDIO v1.0 • Tahap 8 Account System
         </div>
       </div>
     </div>

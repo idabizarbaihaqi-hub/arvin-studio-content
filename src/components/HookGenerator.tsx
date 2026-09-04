@@ -6,8 +6,12 @@ import {
   HookCount,
   HookItem,
   GenerateHooksResult,
+  ActiveView,
 } from '../types';
 import { generateHooks } from '../services/aiService';
+import { recordAiUsage, saveAiHistory } from '../services/storageService';
+import { canUseFeature, consumeFeatureUsage } from '../services/accessControlService';
+import { QuotaExceededModal } from './QuotaExceededModal';
 import {
   ArrowLeft,
   Zap,
@@ -64,9 +68,10 @@ const COUNTS: HookCount[] = [5, 10, 15, 20];
 
 interface HookGeneratorProps {
   onBackToChat?: () => void;
+  onNavigate?: (view: ActiveView) => void;
 }
 
-export const HookGenerator: React.FC<HookGeneratorProps> = ({ onBackToChat }) => {
+export const HookGenerator: React.FC<HookGeneratorProps> = ({ onBackToChat, onNavigate }) => {
   // Form input state
   const [topic, setTopic] = useState('');
   const [platform, setPlatform] = useState<HookPlatform>('TikTok');
@@ -80,6 +85,7 @@ export const HookGenerator: React.FC<HookGeneratorProps> = ({ onBackToChat }) =>
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Result state
   const [result, setResult] = useState<GenerateHooksResult | null>(null);
@@ -136,6 +142,13 @@ export const HookGenerator: React.FC<HookGeneratorProps> = ({ onBackToChat }) =>
       setRegenerateCounter(nextCount);
     }
 
+    // Check daily usage quota for FREE accounts (5x/day per tool)
+    const quotaCheck = await canUseFeature('hook-generator');
+    if (!quotaCheck.allowed) {
+      setShowQuotaModal(true);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -151,6 +164,26 @@ export const HookGenerator: React.FC<HookGeneratorProps> = ({ onBackToChat }) =>
 
       setResult(data);
       setIsFormVisible(false);
+
+      // Record quota consumption only on success
+      await consumeFeatureUsage('hook-generator');
+
+      try {
+        await recordAiUsage('Hook Generator');
+        await saveAiHistory({
+          feature: 'Hook Generator',
+          title: `Hook: ${trimmed.substring(0, 40)}${trimmed.length > 40 ? '...' : ''}`,
+          inputSummary: `Topik: ${trimmed.substring(0, 80)} | Platform: ${platform} | Gaya: ${style}`,
+          result: data.hooks
+            .map(
+              (h, i) =>
+                `${i + 1}. [${h.category}] "${h.text}" (Skor: ${h.score}/100)\nAlasan: ${h.reason}`
+            )
+            .join('\n\n'),
+        });
+      } catch (saveErr) {
+        console.warn('Auto-save history error:', saveErr);
+      }
     } catch (err: any) {
       console.error('Hook generation error:', err);
       const msg = err?.message || 'Maaf, hook belum berhasil dibuat. Silakan coba lagi.';
@@ -767,6 +800,17 @@ export const HookGenerator: React.FC<HookGeneratorProps> = ({ onBackToChat }) =>
           </div>
         )}
       </div>
+
+      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      <QuotaExceededModal
+        isOpen={showQuotaModal}
+        featureLabel="Hook Generator"
+        onClose={() => setShowQuotaModal(false)}
+        onUpgrade={() => {
+          setShowQuotaModal(false);
+          onNavigate?.('premium');
+        }}
+      />
     </div>
   );
 };

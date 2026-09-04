@@ -6,8 +6,12 @@ import {
   HashtagItem,
   HashtagCategory,
   GenerateHashtagsResult,
+  ActiveView,
 } from '../types';
 import { generateHashtags } from '../services/aiService';
+import { recordAiUsage, saveAiHistory } from '../services/storageService';
+import { canUseFeature, consumeFeatureUsage } from '../services/accessControlService';
+import { QuotaExceededModal } from './QuotaExceededModal';
 import {
   ArrowLeft,
   Hash,
@@ -48,9 +52,10 @@ const COUNTS: HashtagCount[] = [5, 10, 15, 20, 30];
 
 interface HashtagGeneratorProps {
   onBackToChat?: () => void;
+  onNavigate?: (view: ActiveView) => void;
 }
 
-export const HashtagGenerator: React.FC<HashtagGeneratorProps> = ({ onBackToChat }) => {
+export const HashtagGenerator: React.FC<HashtagGeneratorProps> = ({ onBackToChat, onNavigate }) => {
   // Form input state
   const [topic, setTopic] = useState('');
   const [platform, setPlatform] = useState<HashtagPlatform>('Instagram');
@@ -64,6 +69,7 @@ export const HashtagGenerator: React.FC<HashtagGeneratorProps> = ({ onBackToChat
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   // Result state
   const [result, setResult] = useState<GenerateHashtagsResult | null>(null);
@@ -111,6 +117,14 @@ export const HashtagGenerator: React.FC<HashtagGeneratorProps> = ({ onBackToChat
       setValidationError('Silakan isi topik konten terlebih dahulu.');
       return;
     }
+
+    // Check daily usage quota for FREE accounts (5x/day per tool)
+    const quotaCheck = await canUseFeature('hashtag-generator');
+    if (!quotaCheck.allowed) {
+      setShowQuotaModal(true);
+      return;
+    }
+
     setValidationError(null);
     setErrorMessage(null);
 
@@ -134,6 +148,21 @@ export const HashtagGenerator: React.FC<HashtagGeneratorProps> = ({ onBackToChat
 
       setResult(data);
       setIsFormVisible(false);
+
+      // Record quota consumption only on success
+      await consumeFeatureUsage('hashtag-generator');
+
+      try {
+        await recordAiUsage('Hashtag Generator');
+        await saveAiHistory({
+          feature: 'Hashtag Generator',
+          title: `Hashtags: ${trimmed.substring(0, 40)}`,
+          inputSummary: `Topik: ${trimmed.substring(0, 80)} | Platform: ${platform} | Niche: ${niche.trim() || '-'}`,
+          result: `Hashtags (${data.hashtags?.length || 0}):\n${(data.hashtags || []).map((h) => `${h.tag} (${h.category} - Relevansi: ${h.relevanceScore}%)`).join('\n')}\n\nRekomendasi:\n${data.recommendation || '-'}`,
+        });
+      } catch (saveErr) {
+        console.warn('Auto-save history error:', saveErr);
+      }
     } catch (err: any) {
       console.error('Hashtag generation error:', err);
       const msg = err?.message || 'Maaf, permintaan belum berhasil diproses. Silakan coba lagi.';
@@ -775,6 +804,17 @@ export const HashtagGenerator: React.FC<HashtagGeneratorProps> = ({ onBackToChat
           </div>
         )}
       </div>
+
+      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      <QuotaExceededModal
+        isOpen={showQuotaModal}
+        featureLabel="Hashtag Generator"
+        onClose={() => setShowQuotaModal(false)}
+        onUpgrade={() => {
+          setShowQuotaModal(false);
+          onNavigate?.('premium');
+        }}
+      />
     </div>
   );
 };

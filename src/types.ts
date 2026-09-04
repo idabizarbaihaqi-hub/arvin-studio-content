@@ -19,6 +19,7 @@ export type SidebarMenuItemId =
   | 'content-planner'
   | 'analytics'
   | 'history'
+  | 'account'
   | 'premium'
   | 'credits'
   | 'profile'
@@ -144,7 +145,15 @@ export type ActiveView =
   | 'hashtag-generator'
   | 'content-planner'
   | 'analytics'
-  | 'history';
+  | 'history'
+  | 'account'
+  | 'profile'
+  | 'premium'
+  | 'credits'
+  | 'settings'
+  | 'login'
+  | 'register'
+  | 'forgot-password';
 
 export type CaptionPlatform =
   | 'Instagram'
@@ -406,27 +415,35 @@ export interface GenerateHashtagsResult {
 
 // CONTENT PLANNER TYPES
 export type ContentPlanPlatform =
+  | 'Facebook'
   | 'Instagram'
   | 'TikTok'
-  | 'Facebook'
   | 'YouTube'
   | 'X'
+  | 'Other'
   | 'LinkedIn';
 
 export type ContentPlanFormat =
-  | 'Reels'
+  | 'Post'
+  | 'Reel'
+  | 'Story'
   | 'Video'
   | 'Carousel'
+  | 'Article'
+  | 'Other'
+  | 'Reels'
   | 'Image'
-  | 'Story'
   | 'Short'
   | 'Long Video'
   | 'Text Post'
   | 'Artikel';
 
 export type ContentPlanStatus =
-  | 'Ide'
   | 'Draft'
+  | 'Scheduled'
+  | 'Published'
+  | 'Cancelled'
+  | 'Ide'
   | 'Siap Diposting'
   | 'Diposting'
   | 'Ditunda';
@@ -478,30 +495,208 @@ export interface AiHistoryItem {
 // ANALYTICS TYPES
 export type AnalyticsPeriod = '7d' | '30d' | '90d' | 'all';
 
+export interface PlatformDistribution {
+  Facebook: number;
+  Instagram: number;
+  TikTok: number;
+  YouTube: number;
+  X: number;
+  Other: number;
+}
+
 export interface AnalyticsSummary {
   period: AnalyticsPeriod;
-  totalContentPlans: number;
-  contentDiposting: number;
-  contentDraft: number;
-  contentSiapDiposting: number;
-  contentIde: number;
-  contentDitunda: number;
+  totalContent: number;
+  scheduled: number;
+  published: number;
+  draft: number;
+  cancelled: number;
+  platformDistribution: PlatformDistribution;
   totalAiGenerations: number;
-  aiFeatureBreakdown: {
-    'Content Analyzer': number;
-    'Content Ideas': number;
-    'Caption Maker': number;
-    'Hook Generator': number;
-    'Script Maker': number;
-    'Hashtag Generator': number;
-    'Chat AI': number;
-  };
+  aiFeatureBreakdown: Record<string, number>;
   dailyActivity: Array<{
     date: string;
     plans: number;
     ai: number;
   }>;
+  // Legacy backwards-compatible aliases
+  totalContentPlans?: number;
+  contentDiposting?: number;
+  contentDraft?: number;
+  contentSiapDiposting?: number;
+  contentIde?: number;
+  contentDitunda?: number;
+  totalGenerated?: number;
+  plansByStatus?: { Draft: number; Scheduled: number; Published: number; Cancelled: number };
+  toolUsageStats?: Array<{ feature: string; count: number; percentage: number }>;
+  dailyUsageTrend?: Array<{ date: string; count: number }>;
 }
+
+// ----------------------------------------------------
+// TAHAP 8: ACCOUNT, PROFILE, SUBSCRIPTION, & CREDITS
+// ----------------------------------------------------
+
+export interface UserProfile {
+  id: string;
+  uid: string;
+  fullName: string;
+  username: string;
+  email: string;
+  photoURL?: string;
+  bio?: string;
+  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
+  adminAccess?: boolean;
+  plan: 'FREE' | 'PREMIUM';
+  subscriptionStatus: 'INACTIVE' | 'ACTIVE';
+  subscriptionExpiry?: string | null;
+  // Backwards compatibility
+  displayName?: string;
+  credits?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PaymentSubscriptionStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAYMENT_SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'EXPIRED';
+
+export interface SubscriptionRecord {
+  id: string;
+  userId: string;
+  plan: string;
+  price: number;
+  duration: string;
+  status: PaymentSubscriptionStatus;
+  paymentProofUrl?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  rejectionReason?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SubscriptionPlan = 'FREE' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+export type SubscriptionStatus = 'FREE' | 'PREMIUM_ACTIVE' | 'PREMIUM_EXPIRED';
+
+export interface UserSubscription {
+  id: string;
+  userId: string;
+  plan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreditTransactionType =
+  | 'EARN'
+  | 'USE'
+  | 'BONUS'
+  | 'REFUND'
+  | 'ADJUSTMENT';
+
+export interface CreditTransaction {
+  id: string;
+  userId: string;
+  type: CreditTransactionType;
+  amount: number;
+  feature: string;
+  description: string;
+  createdAt: string;
+}
+
+export type AiFeatureKey =
+  | 'chat'
+  | 'content-analyzer'
+  | 'content-ideas'
+  | 'caption-maker'
+  | 'hook-generator'
+  | 'script-maker'
+  | 'hashtag-generator';
+
+export interface DailyUsageRecord {
+  id: string;
+  userId: string;
+  date: string;
+  feature: AiFeatureKey;
+  count: number;
+  updatedAt: string;
+}
+
+export interface FeatureUsageStatus {
+  feature: AiFeatureKey;
+  featureLabel: string;
+  count: number;
+  limit: number;
+  remaining: number;
+  isExceeded: boolean;
+}
+
+export interface UsageLimitCheckResult {
+  allowed: boolean;
+  feature: AiFeatureKey;
+  count: number;
+  limit: number;
+  remaining: number;
+  isPremium: boolean;
+  reason?: 'DAILY_LIMIT_REACHED' | 'EXPIRED_FALLBACK_TO_FREE' | 'ALLOWED';
+}
+
+export interface AccountSummary {
+  user: UserProfile;
+  subscription: UserSubscription;
+  creditsBalance: number;
+  creditsUsed: number;
+  dailyUsage: Record<AiFeatureKey, FeatureUsageStatus>;
+  isPremium: boolean;
+}
+
+// ----------------------------------------------------
+// TAHAP 8B: SUPER ADMIN PANEL
+// ----------------------------------------------------
+
+export type AdminViewKey =
+  | 'dashboard'
+  | 'user-management'
+  | 'premium-management'
+  | 'payment-verification'
+  | 'credit-management'
+  | 'ai-usage'
+  | 'content-history'
+  | 'activity-logs'
+  | 'system-settings'
+  | 'admin-profile';
+
+export interface AdminActivityLog {
+  id: string;
+  adminId: string;
+  adminEmail?: string;
+  action: string;
+  targetUserId?: string | null;
+  targetSubscriptionId?: string | null;
+  description: string;
+  createdAt: string;
+}
+
+export interface AdminDashboardMetrics {
+  totalUsers: number;
+  freeUsers: number;
+  premiumUsers: number;
+  pendingPayments: number;
+  totalAiUsage: number;
+  activeSubscriptions: number;
+  revenue: number;
+}
+
+
 
 
 
