@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper to check if current user is owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validation for content_plans
+    function isValidContentPlan(data) {
+      return data.userId is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.topic is string &&
+             data.platform in ['Instagram', 'TikTok', 'Facebook', 'YouTube', 'X', 'LinkedIn'] &&
+             data.format in ['Reels', 'Video', 'Carousel', 'Image', 'Story', 'Short', 'Long Video', 'Text Post', 'Artikel'] &&
+             data.scheduledDate is string &&
+             data.status in ['Ide', 'Draft', 'Siap Diposting', 'Diposting', 'Ditunda'];
+    }
+
+    // Validation for ai_usage
+    function isValidAiUsage(data) {
+      return data.userId is string &&
+             data.feature is string && data.feature.size() > 0 &&
+             data.createdAt is string;
+    }
+
+    // Validation for ai_history
+    function isValidAiHistory(data) {
+      return data.userId is string &&
+             data.feature is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.inputSummary is string &&
+             data.result is string &&
+             data.createdAt is string;
+    }
+
+    // Match content_plans collection
+    match /content_plans/{planId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) && isValidContentPlan(request.resource.data);
+      allow update: if isOwner(resource.data.userId) &&
+                       isOwner(request.resource.data.userId) &&
+                       isValidContentPlan(request.resource.data);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Match ai_usage collection (append-only metrics)
+    match /ai_usage/{usageId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) && isValidAiUsage(request.resource.data);
+      allow update, delete: if false; // Usage logs are immutable
+    }
+
+    // Match ai_history collection
+    match /ai_history/{historyId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId) && isValidAiHistory(request.resource.data);
+      allow update: if isOwner(resource.data.userId) &&
+                       isOwner(request.resource.data.userId) &&
+                       isValidAiHistory(request.resource.data);
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    // Deny all other unmapped paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

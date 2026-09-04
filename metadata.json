@@ -1,0 +1,7 @@
+{
+  "name": "ARVIN STUDIO",
+  "description": "AI-powered workspace untuk content creator berdiskusi ide, strategi konten, caption, hook, script maker, dan hashtag generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

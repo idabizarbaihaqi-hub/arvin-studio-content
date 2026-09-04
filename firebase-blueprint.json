@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "ContentPlan": {
+      "title": "ContentPlan",
+      "description": "Perencanaan konten media sosial pengguna di ARVIN STUDIO",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik rencana konten" },
+        "userId": { "type": "string", "description": "ID unik pemilik dokumen" },
+        "title": { "type": "string", "description": "Judul konten" },
+        "topic": { "type": "string", "description": "Topik bahasan konten" },
+        "platform": {
+          "type": "string",
+          "enum": ["Instagram", "TikTok", "Facebook", "YouTube", "X", "LinkedIn"],
+          "description": "Platform target publikasi"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["Reels", "Video", "Carousel", "Image", "Story", "Short", "Long Video", "Text Post", "Artikel"],
+          "description": "Format konten"
+        },
+        "scheduledDate": { "type": "string", "description": "Tanggal publikasi terencana YYYY-MM-DD" },
+        "scheduledTime": { "type": "string", "description": "Waktu publikasi terencana HH:mm" },
+        "status": {
+          "type": "string",
+          "enum": ["Ide", "Draft", "Siap Diposting", "Diposting", "Ditunda"],
+          "description": "Status pengerjaan konten"
+        },
+        "notes": { "type": "string", "description": "Catatan tambahan atau arahan kreatif" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Waktu pembuatan data ISO" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Waktu pembaruan data ISO" }
+      },
+      "required": ["id", "userId", "title", "topic", "platform", "format", "scheduledDate", "status", "createdAt", "updatedAt"]
+    },
+    "AiUsage": {
+      "title": "AiUsage",
+      "description": "Catatan ringkas kuantitatif penggunaan fitur AI oleh pengguna",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik record penggunaan" },
+        "userId": { "type": "string", "description": "ID unik pengguna" },
+        "feature": { "type": "string", "description": "Nama fitur AI yang berhasil digunakan" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp ISO penggunaan" }
+      },
+      "required": ["id", "userId", "feature", "createdAt"]
+    },
+    "AiHistory": {
+      "title": "AiHistory",
+      "description": "Riwayat hasil generasi dan analisis AI yang pernah dibuat pengguna",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik riwayat" },
+        "userId": { "type": "string", "description": "ID unik pengguna pemilik riwayat" },
+        "feature": { "type": "string", "description": "Kategori fitur AI" },
+        "title": { "type": "string", "description": "Judul atau ringkasan topik riwayat" },
+        "inputSummary": { "type": "string", "description": "Ringkasan input yang dimasukkan pengguna" },
+        "result": { "type": "string", "description": "Hasil keluaran AI yang dihasilkan" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp ISO waktu dibuat" }
+      },
+      "required": ["id", "userId", "feature", "title", "inputSummary", "result", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/content_plans/{planId}": {
+      "schema": { "$ref": "#/entities/ContentPlan" },
+      "description": "Collection rencana konten perorangan yang diisolasi berdasarkan userId"
+    },
+    "/ai_usage/{usageId}": {
+      "schema": { "$ref": "#/entities/AiUsage" },
+      "description": "Collection pencatatan metrik penggunaan AI untuk analitik pengguna"
+    },
+    "/ai_history/{historyId}": {
+      "schema": { "$ref": "#/entities/AiHistory" },
+      "description": "Collection arsip hasil AI pengguna yang dapat disalin atau dihapus"
+    }
+  }
+}
