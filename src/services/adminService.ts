@@ -712,40 +712,98 @@ export interface SystemGeminiConfigResponse {
   source: string;
   maskedKey: string;
   models?: string[];
+  storageLocation?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 /**
- * Get current system Gemini API Key status from server & Firestore
+ * Get current system Gemini API Key status from Firebase Firestore & server.
+ * Pure Firebase Firestore is the single source of truth (not localStorage).
  */
 export async function getSystemGeminiConfig(): Promise<SystemGeminiConfigResponse> {
-  try {
-    const res = await fetch('/api/admin/gemini-config');
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.warn('Gagal memuat status Gemini config dari server:', err);
+  // Ensure localstorage is strictly purged
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('arvin_gemini_api_key');
+    } catch {}
   }
 
-  // Fallback to Firestore check
+  let firestoreKey = '';
+  let firestoreMasked = '';
+  let firestoreModel = '';
+  let updatedAt = '';
+  let updatedBy = '';
+
+  // 1. Read directly from Firebase Firestore
   try {
     const snap = await getDoc(doc(db, 'system_settings', 'gemini_config'));
     if (snap.exists()) {
       const data = snap.data();
-      const rawKey = data?.apiKey || '';
-      return {
-        configured: Boolean(rawKey),
-        source: 'firestore_system_settings',
-        maskedKey: rawKey.length > 10 ? `${rawKey.substring(0, 6)}••••••••••••${rawKey.substring(rawKey.length - 4)}` : '••••••••••••',
-      };
+      firestoreKey = (data?.apiKey || '').trim();
+      firestoreMasked = data?.maskedKey || '';
+      firestoreModel = data?.activeModel || 'gemini-2.5-flash';
+      updatedAt = data?.updatedAt || '';
+      updatedBy = data?.updatedBy || '';
+      if (!firestoreMasked && firestoreKey) {
+        firestoreMasked =
+          firestoreKey.length > 10
+            ? `${firestoreKey.substring(0, 6)}••••••••••••${firestoreKey.substring(firestoreKey.length - 4)}`
+            : '••••••••••••';
+      }
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[Firestore] Gagal membaca system_settings/gemini_config:', err);
+  }
 
-  return { configured: false, source: 'none', maskedKey: '' };
+  // 2. Read server status
+  let serverConfigured = false;
+  let serverMasked = '';
+  try {
+    const res = await fetch('/api/admin/gemini-config');
+    if (res.ok) {
+      const serverData = await res.json();
+      serverConfigured = Boolean(serverData.configured);
+      serverMasked = serverData.maskedKey || '';
+    }
+  } catch (err) {
+    console.warn('[Server] Gagal memeriksa status /api/admin/gemini-config:', err);
+  }
+
+  // 3. If Firestore has a valid key but server is not yet synced (e.g. after container restart), sync it now
+  if (firestoreKey && !serverConfigured) {
+    try {
+      const syncRes = await fetch('/api/admin/gemini-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: firestoreKey }),
+      });
+      if (syncRes.ok) {
+        serverConfigured = true;
+        console.log('[Sync] Kunci API Gemini dari Firebase Firestore berhasil disinkronkan ke backend server.');
+      }
+    } catch (syncErr) {
+      console.warn('[Sync] Gagal auto-sync kunci Firestore ke backend:', syncErr);
+    }
+  }
+
+  const isConfigured = Boolean(firestoreKey || serverConfigured);
+  const displayMasked = firestoreMasked || serverMasked || (firestoreKey ? '••••••••••••••••' : '');
+
+  return {
+    configured: isConfigured,
+    source: firestoreKey ? 'firebase_firestore' : serverConfigured ? 'server_env' : 'none',
+    maskedKey: displayMasked,
+    storageLocation: 'Firebase Firestore (/system_settings/gemini_config)',
+    updatedAt,
+    updatedBy,
+    models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
+  };
 }
 
 /**
- * Super Admin saves a global Gemini API Key that activates AI for ALL users
+ * Super Admin saves a global Gemini API Key that activates AI for ALL users.
+ * STRICTLY SAVED IN FIREBASE FIRESTORE (not localStorage).
  */
 export async function saveSystemGeminiConfig(
   apiKey: string,
@@ -756,7 +814,14 @@ export async function saveSystemGeminiConfig(
     throw new Error('Kunci API tidak boleh kosong.');
   }
 
-  // 1. Send to server for verification and persistent saving
+  // Strictly purge localStorage to prevent any stale local browser caching
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('arvin_gemini_api_key');
+    } catch {}
+  }
+
+  // 1. Send to server for verification against Google Gemini API
   const res = await fetch('/api/admin/gemini-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -768,52 +833,81 @@ export async function saveSystemGeminiConfig(
     throw new Error(data?.error || 'Gagal memverifikasi dan menyimpan kunci API di server.');
   }
 
-  // 2. Also back up to Firestore system_settings collection
+  const masked =
+    data.maskedKey ||
+    (trimmed.length > 10
+      ? `${trimmed.substring(0, 6)}••••••••••••${trimmed.substring(trimmed.length - 4)}`
+      : '••••••••••••');
+
+  // 2. Save directly to Firebase Firestore collection 'system_settings', doc 'gemini_config'
   try {
     await setDoc(doc(db, 'system_settings', 'gemini_config'), {
       apiKey: trimmed,
-      maskedKey: data.maskedKey || `${trimmed.substring(0, 6)}••••••••••••`,
+      maskedKey: masked,
       activeModel: data.model || 'gemini-2.5-flash',
+      storageLocation: 'Firebase Firestore (/system_settings/gemini_config)',
+      firestoreDatabaseId: 'ai-studio-arvinstudioconte-b14a93ee-b611-427e-9737-40f31360b37c',
+      updatedAt: new Date().toISOString(),
+      updatedBy: adminUser.email,
+      adminId: adminUser.uid || adminUser.id,
+    });
+    console.log('[Firestore] Kunci API Gemini berhasil disimpan secara permanen di Firebase Firestore.');
+  } catch (err: any) {
+    console.error('[Firestore] Gagal menyimpan ke Firebase Firestore:', err);
+    throw new Error(`Gagal menyimpan ke Firebase Firestore: ${err?.message || err}`);
+  }
+
+  // 3. Log admin activity in Firestore audit logs
+  await logAdminActivity({
+    adminUser,
+    action: 'UPDATE_SYSTEM_GEMINI_KEY',
+    targetId: 'gemini_config',
+    description: `Super Admin memperbarui Kunci API Gemini Sistem (${masked}) di Firebase Firestore. AI aktif untuk seluruh pengguna.`,
+  });
+
+  return {
+    ...data,
+    maskedKey: masked,
+    message: 'Kunci Gemini API berhasil diverifikasi & disimpan secara permanen di Firebase Firestore! Seluruh pengguna dapat langsung menikmati fitur AI.',
+  };
+}
+
+/**
+ * Super Admin deletes/clears the global Gemini API Key from Firebase Firestore
+ */
+export async function removeSystemGeminiConfig(adminUser: UserProfile): Promise<void> {
+  // Purge localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('arvin_gemini_api_key');
+    } catch {}
+  }
+
+  // Clear in Firebase Firestore
+  try {
+    await setDoc(doc(db, 'system_settings', 'gemini_config'), {
+      apiKey: '',
+      maskedKey: '',
+      activeModel: '',
+      storageLocation: 'Firebase Firestore (/system_settings/gemini_config)',
       updatedAt: new Date().toISOString(),
       updatedBy: adminUser.email,
       adminId: adminUser.uid || adminUser.id,
     });
   } catch (err) {
-    console.warn('Gagal sinkronisasi backup Firestore system_settings:', err);
+    console.warn('[Firestore] Gagal membersihkan dokumen di Firebase:', err);
   }
 
-  // 3. Log admin activity
-  await logAdminActivity({
-    adminUser,
-    action: 'UPDATE_SYSTEM_GEMINI_KEY',
-    targetId: 'gemini_config',
-    description: `Super Admin memperbarui Kunci API Gemini Sistem (${data.maskedKey || 'terkonfigurasi'}). AI kini aktif untuk seluruh pengguna.`,
-  });
-
-  return data;
-}
-
-/**
- * Super Admin deletes/clears the global Gemini API Key
- */
-export async function removeSystemGeminiConfig(adminUser: UserProfile): Promise<void> {
-  await fetch('/api/admin/gemini-config', { method: 'DELETE' });
-
+  // Clear in backend server
   try {
-    await setDoc(doc(db, 'system_settings', 'gemini_config'), {
-      apiKey: '',
-      maskedKey: '',
-      updatedAt: new Date().toISOString(),
-      updatedBy: adminUser.email,
-      adminId: adminUser.uid || adminUser.id,
-    });
+    await fetch('/api/admin/gemini-config', { method: 'DELETE' });
   } catch {}
 
   await logAdminActivity({
     adminUser,
     action: 'DELETE_SYSTEM_GEMINI_KEY',
     targetId: 'gemini_config',
-    description: 'Super Admin menghapus Kunci API Gemini Sistem.',
+    description: 'Super Admin menghapus Kunci API Gemini Sistem dari Firebase Firestore.',
   });
 }
 

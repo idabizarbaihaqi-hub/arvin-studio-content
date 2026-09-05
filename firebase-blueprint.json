@@ -147,6 +147,21 @@
         "updatedBy": { "type": "string", "description": "UID admin pengubah" }
       },
       "required": ["id", "bankName", "accountName", "accountNumber", "isActive", "createdAt", "updatedAt", "createdBy", "updatedBy"]
+    },
+    "SystemSetting": {
+      "title": "SystemSetting",
+      "description": "Pengaturan sistem terpusat Super Admin di collection system_settings (termasuk Kunci API Gemini Global)",
+      "type": "object",
+      "properties": {
+        "apiKey": { "type": "string", "description": "Kunci API Google Gemini sistem terenkripsi/terpusat" },
+        "maskedKey": { "type": "string", "description": "Kunci bertopeng untuk tampilan aman" },
+        "activeModel": { "type": "string", "description": "Model Gemini yang terverifikasi aktif" },
+        "storageLocation": { "type": "string", "description": "Lokasi penyimpanan permanen Firestore" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" },
+        "updatedBy": { "type": "string", "description": "Email super admin pengubah" },
+        "adminId": { "type": "string", "description": "UID super admin pengubah" }
+      },
+      "required": ["apiKey", "updatedAt", "updatedBy"]
     }
   },
   "firestore": {
@@ -181,6 +196,10 @@
     "/admin_activity_logs/{logId}": {
       "schema": { "$ref": "#/entities/AdminActivityLog" },
       "description": "Arsip log aktivitas operasional Super Admin"
+    },
+    "/system_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SystemSetting" },
+      "description": "Konfigurasi terpusat Super Admin di Firestore termasuk Kunci API Gemini Global"
     }
   }
 }

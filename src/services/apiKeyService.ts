@@ -1,48 +1,56 @@
 import { GoogleGenAI } from '@google/genai';
 
-const API_KEY_STORAGE_KEY = 'arvin_gemini_api_key';
+const DEPRECATED_LOCALSTORAGE_KEY = 'arvin_gemini_api_key';
+
+// Automatically purge any residual keys from localStorage on load
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem(DEPRECATED_LOCALSTORAGE_KEY)) {
+      localStorage.removeItem(DEPRECATED_LOCALSTORAGE_KEY);
+      console.log('[Security] Kunci API Gemini lokal dihapus dari localStorage. Kunci kini tersimpan aman di Firebase Firestore.');
+    }
+  } catch {}
+}
 
 /**
- * Get the stored Gemini API key from localStorage or Vite environment variable
+ * Get stored Gemini API key: No longer stored in localStorage.
+ * Only fallback to VITE_GEMINI_API_KEY if present, otherwise relies purely on server & Firebase.
  */
 export function getStoredApiKey(): string {
   if (typeof window === 'undefined') return '';
-  const stored = localStorage.getItem(API_KEY_STORAGE_KEY);
-  if (stored && stored.trim().length > 0) {
-    return stored.trim();
-  }
+  // Purge any stale localStorage
+  try {
+    localStorage.removeItem(DEPRECATED_LOCALSTORAGE_KEY);
+  } catch {}
   const envKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-  return (typeof envKey === 'string' ? envKey : '');
+  return typeof envKey === 'string' ? envKey.trim() : '';
 }
 
 /**
- * Save custom Gemini API key into localStorage
+ * Deprecated: Do not save to localStorage. All persistence is strictly in Firebase Firestore.
  */
-export function setStoredApiKey(key: string): void {
+export function setStoredApiKey(_key: string): void {
   if (typeof window === 'undefined') return;
-  const trimmed = key.trim();
-  if (trimmed) {
-    localStorage.setItem(API_KEY_STORAGE_KEY, trimmed);
-  } else {
-    localStorage.removeItem(API_KEY_STORAGE_KEY);
-  }
+  try {
+    localStorage.removeItem(DEPRECATED_LOCALSTORAGE_KEY);
+  } catch {}
 }
 
 /**
- * Remove stored custom Gemini API key from localStorage
+ * Remove stored custom Gemini API key
  */
 export function removeStoredApiKey(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(API_KEY_STORAGE_KEY);
+  try {
+    localStorage.removeItem(DEPRECATED_LOCALSTORAGE_KEY);
+  } catch {}
 }
 
 /**
- * Check if a custom API key is present in localStorage
+ * Check if a custom API key is present
  */
 export function hasCustomApiKey(): boolean {
-  if (typeof window === 'undefined') return false;
-  const key = localStorage.getItem(API_KEY_STORAGE_KEY);
-  return Boolean(key && key.trim().length > 0);
+  return false;
 }
 
 /**

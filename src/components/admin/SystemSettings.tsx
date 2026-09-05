@@ -171,6 +171,24 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
           </div>
         </div>
 
+        {/* Firebase Firestore Storage Guarantee Banner */}
+        <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 flex items-start gap-3 text-xs text-blue-950">
+          <div className="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center shrink-0 mt-0.5 font-black text-xs shadow-xs">
+            🔥
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap font-bold text-blue-900">
+              <span>Lokasi Penyimpanan: Firebase Cloud Firestore</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-mono">
+                /system_settings/gemini_config
+              </span>
+            </div>
+            <p className="text-[11px] text-blue-800 leading-relaxed">
+              Kunci API disimpan langsung di <strong>Cloud Firestore</strong> (bukan di LocalStorage browser). Data bersifat permanen dan tidak akan hilang atau berubah meskipun cache dibersihkan, pengguna ganti perangkat (HP/Laptop), atau server di-restart.
+            </p>
+          </div>
+        </div>
+
         {/* Current status display */}
         {geminiConfig?.configured && (
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
@@ -179,14 +197,17 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-semibold text-slate-800 flex items-center gap-2">
+                <div className="font-semibold text-slate-800 flex items-center gap-2 flex-wrap">
                   <span>Kunci Aktif:</span>
                   <code className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-700">
                     {geminiConfig.maskedKey || '••••••••••••••••'}
                   </code>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    Firestore Cloud
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Sumber: {geminiConfig.source === 'super_admin_input' ? 'Input Super Admin (Aktif)' : 'Environment Variable'} | Seluruh user dapat langsung menggunakan AI.
+                  Tersimpan di koleksi <code>system_settings</code> di Firebase. Seluruh kreator dan pengguna langsung dapat menggunakan seluruh fitur AI secara otomatis.
                 </p>
               </div>
             </div>
@@ -195,7 +216,7 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
               type="button"
               onClick={handleRemoveGeminiKey}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-white hover:bg-red-50 text-red-600 font-semibold text-xs transition-colors cursor-pointer self-start sm:self-auto"
-              title="Hapus Kunci API Gemini Sistem"
+              title="Hapus Kunci API Gemini Sistem dari Firebase"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Hapus Kunci</span>
