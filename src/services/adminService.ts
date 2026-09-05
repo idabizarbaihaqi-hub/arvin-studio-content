@@ -706,3 +706,114 @@ export async function getAdminActivityLogs(): Promise<AdminActivityLog[]> {
 
   return logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
+
+export interface SystemGeminiConfigResponse {
+  configured: boolean;
+  source: string;
+  maskedKey: string;
+  models?: string[];
+}
+
+/**
+ * Get current system Gemini API Key status from server & Firestore
+ */
+export async function getSystemGeminiConfig(): Promise<SystemGeminiConfigResponse> {
+  try {
+    const res = await fetch('/api/admin/gemini-config');
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Gagal memuat status Gemini config dari server:', err);
+  }
+
+  // Fallback to Firestore check
+  try {
+    const snap = await getDoc(doc(db, 'system_settings', 'gemini_config'));
+    if (snap.exists()) {
+      const data = snap.data();
+      const rawKey = data?.apiKey || '';
+      return {
+        configured: Boolean(rawKey),
+        source: 'firestore_system_settings',
+        maskedKey: rawKey.length > 10 ? `${rawKey.substring(0, 6)}••••••••••••${rawKey.substring(rawKey.length - 4)}` : '••••••••••••',
+      };
+    }
+  } catch {}
+
+  return { configured: false, source: 'none', maskedKey: '' };
+}
+
+/**
+ * Super Admin saves a global Gemini API Key that activates AI for ALL users
+ */
+export async function saveSystemGeminiConfig(
+  apiKey: string,
+  adminUser: UserProfile
+): Promise<{ success: boolean; message: string; maskedKey?: string; model?: string }> {
+  const trimmed = apiKey.trim();
+  if (!trimmed) {
+    throw new Error('Kunci API tidak boleh kosong.');
+  }
+
+  // 1. Send to server for verification and persistent saving
+  const res = await fetch('/api/admin/gemini-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey: trimmed }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error || 'Gagal memverifikasi dan menyimpan kunci API di server.');
+  }
+
+  // 2. Also back up to Firestore system_settings collection
+  try {
+    await setDoc(doc(db, 'system_settings', 'gemini_config'), {
+      apiKey: trimmed,
+      maskedKey: data.maskedKey || `${trimmed.substring(0, 6)}••••••••••••`,
+      activeModel: data.model || 'gemini-2.5-flash',
+      updatedAt: new Date().toISOString(),
+      updatedBy: adminUser.email,
+      adminId: adminUser.uid || adminUser.id,
+    });
+  } catch (err) {
+    console.warn('Gagal sinkronisasi backup Firestore system_settings:', err);
+  }
+
+  // 3. Log admin activity
+  await logAdminActivity({
+    adminUser,
+    action: 'UPDATE_SYSTEM_GEMINI_KEY',
+    targetId: 'gemini_config',
+    description: `Super Admin memperbarui Kunci API Gemini Sistem (${data.maskedKey || 'terkonfigurasi'}). AI kini aktif untuk seluruh pengguna.`,
+  });
+
+  return data;
+}
+
+/**
+ * Super Admin deletes/clears the global Gemini API Key
+ */
+export async function removeSystemGeminiConfig(adminUser: UserProfile): Promise<void> {
+  await fetch('/api/admin/gemini-config', { method: 'DELETE' });
+
+  try {
+    await setDoc(doc(db, 'system_settings', 'gemini_config'), {
+      apiKey: '',
+      maskedKey: '',
+      updatedAt: new Date().toISOString(),
+      updatedBy: adminUser.email,
+      adminId: adminUser.uid || adminUser.id,
+    });
+  } catch {}
+
+  await logAdminActivity({
+    adminUser,
+    action: 'DELETE_SYSTEM_GEMINI_KEY',
+    targetId: 'gemini_config',
+    description: 'Super Admin menghapus Kunci API Gemini Sistem.',
+  });
+}
+

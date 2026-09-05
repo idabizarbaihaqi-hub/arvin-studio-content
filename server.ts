@@ -202,13 +202,57 @@ function logAiHistory(
   }
 }
 
+// Persistent System Configuration (for Super Admin configured Gemini API Key)
+const SYSTEM_CONFIG_PATH = path.join(dataDir, "system_config.json");
+let systemGeminiApiKey: string | null = null;
+
+function initSystemGeminiKey(): void {
+  try {
+    if (fs.existsSync(SYSTEM_CONFIG_PATH)) {
+      const raw = fs.readFileSync(SYSTEM_CONFIG_PATH, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed.geminiApiKey && typeof parsed.geminiApiKey === "string" && parsed.geminiApiKey.trim()) {
+        systemGeminiApiKey = parsed.geminiApiKey.trim();
+        console.log("[Server] Loaded System Gemini API Key from persistent storage.");
+      }
+    }
+  } catch (err) {
+    console.warn("[Server] Failed to load system config:", err);
+  }
+}
+initSystemGeminiKey();
+
+function saveSystemGeminiKey(apiKey: string | null): void {
+  try {
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    systemGeminiApiKey = apiKey ? apiKey.trim() : null;
+    let config: any = {};
+    if (fs.existsSync(SYSTEM_CONFIG_PATH)) {
+      try {
+        config = JSON.parse(fs.readFileSync(SYSTEM_CONFIG_PATH, "utf-8"));
+      } catch {}
+    }
+    config.geminiApiKey = systemGeminiApiKey;
+    config.updatedAt = new Date().toISOString();
+    fs.writeFileSync(SYSTEM_CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Server] Failed to save system config:", err);
+  }
+}
+
 // Initialize Gemini SDK with User-Agent telemetry
 function getGeminiClient(customApiKey?: string): GoogleGenAI {
-  const apiKey = (customApiKey && customApiKey.trim()) || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const apiKey =
+    (customApiKey && customApiKey.trim()) ||
+    systemGeminiApiKey ||
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "GEMINI_API_KEY belum dikonfigurasi di server. Silakan atur GEMINI_API_KEY di Environment Variables Vercel agar aplikasi bekerja otomatis untuk semua pengunjung, atau masukkan API Key sementara melalui menu aplikasi."
+      "Layanan AI belum dikonfigurasi. Super Admin belum memasukkan GEMINI_API_KEY di menu System Settings pada panel admin."
     );
   }
   return new GoogleGenAI({
@@ -486,6 +530,112 @@ async function generateAIContentWithFallback(
 // API routes
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", app: "ARVIN STUDIO", timestamp: new Date().toISOString() });
+});
+
+// Admin endpoints for Gemini API Key configuration
+app.get("/api/admin/gemini-config", (_req: Request, res: Response): void => {
+  const activeKey =
+    systemGeminiApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const isConfigured = Boolean(activeKey && activeKey.trim());
+  let maskedKey = "";
+  if (activeKey && activeKey.trim()) {
+    const k = activeKey.trim();
+    maskedKey =
+      k.length > 10 ? `${k.substring(0, 6)}••••••••••••${k.substring(k.length - 4)}` : "••••••••••••";
+  }
+  res.json({
+    configured: isConfigured,
+    source: systemGeminiApiKey
+      ? "super_admin_input"
+      : process.env.GEMINI_API_KEY
+      ? "env_variable"
+      : process.env.VITE_GEMINI_API_KEY
+      ? "vite_env"
+      : "none",
+    maskedKey,
+    models: CANDIDATE_MODELS,
+  });
+});
+
+app.post("/api/admin/gemini-config", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { apiKey } = req.body as { apiKey?: string };
+    const trimmed = (apiKey || "").trim();
+
+    if (!trimmed) {
+      res.status(400).json({ error: "Kunci API tidak boleh kosong." });
+      return;
+    }
+
+    // Verify key with Gemini test call
+    const testAi = new GoogleGenAI({
+      apiKey: trimmed,
+      httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+    });
+
+    let verifiedModel = "";
+    let testSuccess = false;
+    let lastErrString = "";
+
+    for (const modelName of CANDIDATE_MODELS) {
+      try {
+        const response = await testAi.models.generateContent({
+          model: modelName,
+          contents: "Hello, respond with 1 word: OK",
+        });
+        if (response?.text) {
+          verifiedModel = modelName;
+          testSuccess = true;
+          break;
+        }
+      } catch (err: any) {
+        lastErrString = String(err?.message || err);
+        if (lastErrString.includes("API_KEY_INVALID") || lastErrString.includes("API key not valid")) {
+          res.status(400).json({
+            error:
+              "Kunci API tidak valid atau telah kedaluwarsa. Periksa kembali di Google AI Studio (aistudio.google.com).",
+          });
+          return;
+        }
+        continue;
+      }
+    }
+
+    if (!testSuccess) {
+      res.status(400).json({
+        error: `Gagal memverifikasi API Key ke Google Gemini: ${lastErrString || "Tidak menerima respon"}`,
+      });
+      return;
+    }
+
+    // Save as system key
+    saveSystemGeminiKey(trimmed);
+
+    const maskedKey =
+      trimmed.length > 10
+        ? `${trimmed.substring(0, 6)}••••••••••••${trimmed.substring(trimmed.length - 4)}`
+        : "••••••••••••";
+
+    res.json({
+      success: true,
+      message: `Kunci Gemini API berhasil diverifikasi & disimpan (Model: ${verifiedModel}). Sekarang semua pengguna dapat langsung menggunakan fitur AI secara otomatis tanpa perlu input API key!`,
+      configured: true,
+      maskedKey,
+      model: verifiedModel,
+    });
+  } catch (error: any) {
+    console.error("[Admin API] Failed to update gemini key:", error);
+    res.status(500).json({ error: error?.message || "Gagal menyimpan konfigurasi API key." });
+  }
+});
+
+app.delete("/api/admin/gemini-config", (_req: Request, res: Response): void => {
+  saveSystemGeminiKey(null);
+  res.json({
+    success: true,
+    message: "Kunci Gemini API sistem berhasil dihapus.",
+    configured: Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY),
+  });
 });
 
 interface ChatMessagePayload {

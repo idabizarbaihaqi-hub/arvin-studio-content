@@ -108,6 +108,11 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
+    // Match system_settings collection (Super Admin global config, e.g. Gemini AI Key)
+    match /system_settings/{settingId} {
+      allow read, write: if isSuperAdmin();
+    }
+
     // Deny all other paths
     match /{document=**} {
       allow read, write: if false;

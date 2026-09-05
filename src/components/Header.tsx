@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, MoreVertical, Key } from 'lucide-react';
+import { Menu, MoreVertical } from 'lucide-react';
 import { AsLogo } from './AsLogo';
 import { ActiveView } from '../types';
 
@@ -16,7 +16,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMenu,
   hasMessages,
   activeView = 'chat',
-  onOpenApiKeyModal,
 }) => {
   return (
     <header
@@ -116,19 +115,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Status badge & More menu */}
       <div className="flex items-center gap-2">
-        {onOpenApiKeyModal && (
-          <button
-            id="btn-header-api-key"
-            type="button"
-            onClick={onOpenApiKeyModal}
-            title="Input atau ganti GEMINI_API_KEY"
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded-full text-xs font-semibold transition-colors cursor-pointer"
-          >
-            <Key className="w-3.5 h-3.5 text-amber-600" />
-            <span className="hidden sm:inline">API Key</span>
-          </button>
-        )}
-
         <div className="px-2.5 sm:px-3 py-0.5 sm:py-1 bg-emerald-50 text-[10px] sm:text-[11px] font-bold text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-wider">
           {activeView !== 'chat' || hasMessages ? 'Aktif' : 'Online'}
         </div>

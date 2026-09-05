@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   User,
   Mail,
-  Key,
   Shield,
   Globe,
   Bell,
@@ -21,7 +20,6 @@ import {
 } from 'lucide-react';
 import { ActiveView } from '../types';
 import { logoutUser } from '../services/accessControlService';
-import { ApiKeyModal } from './ApiKeyModal';
 
 interface SettingsProps {
   onBack: () => void;
@@ -37,7 +35,6 @@ export const Settings: React.FC<SettingsProps> = ({
   userEmail,
 }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const handleConfirmLogout = async () => {
@@ -117,7 +114,7 @@ export const Settings: React.FC<SettingsProps> = ({
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                  <Key className="w-4 h-4" />
+                  <Lock className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-slate-900">Password</h3>
@@ -147,28 +144,26 @@ export const Settings: React.FC<SettingsProps> = ({
               </span>
             </button>
 
-            {/* Gemini API Key */}
-            <button
-              type="button"
-              onClick={() => setShowApiKeyModal(true)}
-              className="w-full p-4 flex items-center justify-between hover:bg-amber-50/40 transition-colors text-left cursor-pointer"
-            >
+            {/* AI Engine - Terpusat & Otomatis */}
+            <div className="w-full p-4 flex items-center justify-between text-left">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <Key className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm text-slate-900">GEMINI_API_KEY</h3>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800">
-                      API
+                    <h3 className="font-semibold text-sm text-slate-900">Google Gemini AI Engine</h3>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 text-emerald-800">
+                      OTOMATIS
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">Input atau ubah kunci API Google Gemini pribadi</p>
+                  <p className="text-xs text-slate-500">Dikelola oleh Super Admin — siap digunakan langsung tanpa perlu input API key</p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </button>
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                Tersedia
+              </span>
+            </div>
           </div>
         </div>
 
@@ -510,12 +505,6 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
         )}
-
-        {/* ApiKeyModal */}
-        <ApiKeyModal
-          isOpen={showApiKeyModal}
-          onClose={() => setShowApiKeyModal(false)}
-        />
       </div>
     </div>
   );

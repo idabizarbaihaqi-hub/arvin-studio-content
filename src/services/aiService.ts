@@ -156,7 +156,7 @@ export async function sendChatMessage(
         throw new Error(serverErrorMsg);
       }
       throw new Error(
-        `Layanan AI tidak dapat diakses (Status ${response.status}). Silakan atur API Key melalui tombol "Input GEMINI_API_KEY".`
+        `Layanan AI tidak dapat diakses (Status ${response.status}). Hubungi Super Admin atau coba beberapa saat lagi.`
       );
     }
   } catch (error: any) {
@@ -166,17 +166,17 @@ export async function sendChatMessage(
       try {
         return await directClientGeminiChat(userApiKey, messages);
       } catch (clientErr: any) {
-        throw new Error(clientErr?.message || 'Gagal menghubungi Gemini AI dengan API Key yang tersimpan.');
+        throw new Error(clientErr?.message || 'Gagal menghubungi Gemini AI.');
       }
     }
 
     const message = error?.message || '';
-    if (message.includes('GEMINI_API_KEY') || message.includes('Input GEMINI_API_KEY')) {
+    if (message) {
       throw error;
     }
 
     throw new Error(
-      'Koneksi AI Terputus. Server API tidak dapat dijangkau dan GEMINI_API_KEY belum diatur. Silakan klik tombol "Input GEMINI_API_KEY" untuk menghubungkan langsung.'
+      'Koneksi AI Terputus. Server API tidak dapat dijangkau. Silakan hubungi administrator atau coba lagi beberapa saat.'
     );
   }
 

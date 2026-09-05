@@ -10,6 +10,11 @@ import {
   consumeFeatureUsage,
 } from './services/accessControlService';
 import { recordAiUsage, saveAiHistory } from './services/storageService';
+import {
+  getUserChatMessages,
+  saveUserChatMessages,
+  clearUserChatMessages,
+} from './services/chatStorageService';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { EmptyState } from './components/EmptyState';
@@ -36,7 +41,6 @@ import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { AsLogo } from './components/AsLogo';
 import { FeaturePlaceholderModal } from './components/FeaturePlaceholderModal';
 import { OptionsMenuModal } from './components/OptionsMenuModal';
-import { ApiKeyModal } from './components/ApiKeyModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { SuperAdminGuard } from './components/admin/SuperAdminGuard';
 
@@ -55,8 +59,33 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [placeholderItem, setPlaceholderItem] = useState<MenuItem | null>(null);
+
+  // Load & isolate chat history per authenticated user account
+  const activeUserId = currentUser?.id || null;
+  const activeUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!activeUserId) {
+      setMessages([]);
+      setInputText('');
+      activeUserIdRef.current = null;
+    } else {
+      if (activeUserIdRef.current !== activeUserId) {
+        const stored = getUserChatMessages(activeUserId);
+        setMessages(stored);
+        setInputText('');
+        activeUserIdRef.current = activeUserId;
+      }
+    }
+  }, [activeUserId]);
+
+  // Persist current user's chat messages whenever they change
+  useEffect(() => {
+    if (activeUserId && messages.length > 0) {
+      saveUserChatMessages(activeUserId, messages);
+    }
+  }, [messages, activeUserId]);
 
   // Sync route with browser history (popstate)
   useEffect(() => {
@@ -76,11 +105,17 @@ export default function App() {
     const unsubscribe = subscribeToAuth(async (firebaseUser) => {
       if (!firebaseUser) {
         setCurrentUser(null);
+        setMessages([]);
+        setInputText('');
+        activeUserIdRef.current = null;
         setAuthChecking(false);
       } else {
         try {
           const profile = await getUserProfile(firebaseUser.uid);
           setCurrentUser(profile);
+          activeUserIdRef.current = profile.id;
+          const userMsgs = getUserChatMessages(profile.id);
+          setMessages(userMsgs);
           if (profile.role === 'SUPER_ADMIN') {
             if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/dashboard')) {
               setAppRoute('admin');
@@ -90,6 +125,8 @@ export default function App() {
         } catch (err) {
           console.warn('Could not load user profile on auth change:', err);
           setCurrentUser(null);
+          setMessages([]);
+          activeUserIdRef.current = null;
         } finally {
           setAuthChecking(false);
         }
@@ -102,6 +139,9 @@ export default function App() {
   const handleLogout = async () => {
     await logoutUser();
     setCurrentUser(null);
+    setMessages([]);
+    setInputText('');
+    activeUserIdRef.current = null;
     setUnauthView('login');
     setActiveView('chat');
     setAppRoute('dashboard');
@@ -112,6 +152,10 @@ export default function App() {
 
   const handleLoginSuccess = (user: UserProfile) => {
     setCurrentUser(user);
+    activeUserIdRef.current = user.id;
+    const userMsgs = getUserChatMessages(user.id);
+    setMessages(userMsgs);
+    setInputText('');
     if (user.role === 'SUPER_ADMIN') {
       setAppRoute('admin');
       window.history.pushState(null, '', '/admin');
@@ -287,8 +331,11 @@ export default function App() {
     }
   };
 
-  // Chat Baru: Resets active view to empty chat state
+  // Chat Baru: Resets active view to empty chat state and clears active user's chat history
   const handleNewChat = () => {
+    if (activeUserId) {
+      clearUserChatMessages(activeUserId);
+    }
     setMessages([]);
     setInputText('');
     setIsLoading(false);
@@ -379,7 +426,6 @@ export default function App() {
       <Header
         onOpenSidebar={() => setIsSidebarOpen(true)}
         onOpenMenu={() => setIsOptionsMenuOpen(true)}
-        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
         hasMessages={messages.length > 0}
         activeView={activeView}
       />
@@ -468,7 +514,6 @@ export default function App() {
                       message={msg}
                       onRetry={handleRetryLast}
                       isLast={index === messages.length - 1}
-                      onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
                     />
                   ))}
 
@@ -525,13 +570,6 @@ export default function App() {
         onNewChat={handleNewChat}
         messageCount={messages.length}
         onNavigate={setActiveView}
-        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-      />
-
-      {/* GEMINI_API_KEY Input Modal */}
-      <ApiKeyModal
-        isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
       />
     </div>
   );

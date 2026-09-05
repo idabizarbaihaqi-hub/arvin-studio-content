@@ -12,9 +12,17 @@ import {
   Coins,
   ShieldCheck,
   Landmark,
+  Key,
+  Sparkles,
 } from 'lucide-react';
 import { AdminDashboardMetrics, AdminViewKey, SubscriptionRecord, AdminActivityLog } from '../../types';
-import { getAdminStats, getPendingPayments, getAdminActivityLogs } from '../../services/adminService';
+import {
+  getAdminStats,
+  getPendingPayments,
+  getAdminActivityLogs,
+  getSystemGeminiConfig,
+  SystemGeminiConfigResponse,
+} from '../../services/adminService';
 import { getPaymentAccountStats } from '../../services/paymentAccountService';
 
 interface AdminDashboardProps {
@@ -26,21 +34,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
   const [pendingPayments, setPendingPayments] = useState<SubscriptionRecord[]>([]);
   const [recentLogs, setRecentLogs] = useState<AdminActivityLog[]>([]);
   const [paymentStats, setPaymentStats] = useState<{ total: number; active: number }>({ total: 0, active: 0 });
+  const [geminiConfig, setGeminiConfig] = useState<SystemGeminiConfigResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
     try {
-      const [stats, pending, logs, accStats] = await Promise.all([
+      const [stats, pending, logs, accStats, gConfig] = await Promise.all([
         getAdminStats(),
         getPendingPayments(),
         getAdminActivityLogs(),
         getPaymentAccountStats(),
+        getSystemGeminiConfig(),
       ]);
       setMetrics(stats);
       setPendingPayments(pending.slice(0, 5));
       setRecentLogs(logs.slice(0, 5));
       setPaymentStats(accStats);
+      setGeminiConfig(gConfig);
     } catch (err) {
       console.error('Failed to load admin dashboard data:', err);
     } finally {
@@ -179,6 +190,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
           <div className="flex items-center gap-1 text-xs font-bold text-amber-900 shrink-0">
             <span>Verifikasi Sekarang</span>
             <ArrowUpRight className="w-4 h-4" />
+          </div>
+        </div>
+      )}
+
+      {/* Gemini API Key System Status Banner */}
+      {!geminiConfig?.configured ? (
+        <div
+          id="admin-gemini-alert-banner"
+          onClick={() => onNavigate('system-settings')}
+          className="p-4 rounded-2xl bg-red-50/90 border border-red-200 flex items-center justify-between gap-4 cursor-pointer hover:bg-red-100/70 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Key className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-red-950 flex items-center gap-2">
+                <span>KUNCI API GEMINI BELUM DIAKTIFKAN</span>
+                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-red-200 text-red-900">Penting</span>
+              </h3>
+              <p className="text-xs text-red-800">
+                Fitur AI untuk pengguna belum bisa berjalan. Masukkan Kunci Gemini API sekarang agar seluruh pengguna dapat langsung menikmati layanan AI tanpa perlu input manual.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-xs font-bold text-red-900 shrink-0">
+            <span>Input API Key Sekarang</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </div>
+        </div>
+      ) : (
+        <div
+          id="admin-gemini-active-banner"
+          onClick={() => onNavigate('system-settings')}
+          className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between gap-4 cursor-pointer hover:bg-emerald-100/60 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-950">Kunci Gemini API Sistem Aktif</span>
+                <code className="text-[11px] font-mono bg-white/90 border border-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded">
+                  {geminiConfig.maskedKey}
+                </code>
+              </div>
+              <p className="text-[11px] text-emerald-800/90 mt-0.5">
+                AI aktif secara terpusat untuk seluruh pengguna dan pengunjung. Pengguna tidak perlu memasukkan API key secara manual.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 text-xs font-bold text-emerald-900 shrink-0">
+            <span>Kelola Kunci</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
           </div>
         </div>
       )}
