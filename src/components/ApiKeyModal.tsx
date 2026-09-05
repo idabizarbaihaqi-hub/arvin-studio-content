@@ -221,13 +221,36 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             </p>
           </div>
 
+          {/* Automatic Setup Guide for Website Owner */}
+          <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2">
+            <div className="flex items-center gap-1.5 font-bold text-amber-900 text-[13px]">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Ingin Agar Pengguna/Pengunjung Tidak Perlu Input API Key?</span>
+            </div>
+            <p className="text-amber-900 leading-relaxed text-[12px]">
+              Agar web Anda di Vercel (<code>arvin-studio-content.vercel.app</code>) langsung aktif otomatis untuk <strong>semua pengunjung</strong> tanpa perlu mereka input API Key manual:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-amber-900/90 text-[11.5px] bg-white/70 p-2.5 rounded-lg border border-amber-200/60 font-medium">
+              <li>Buka dashboard proyek Anda di <strong>vercel.com</strong></li>
+              <li>Pilih menu <strong>Settings</strong> $\rightarrow$ <strong>Environment Variables</strong></li>
+              <li>Tambahkan variable: <strong>Key</strong> = <code>GEMINI_API_KEY</code>, <strong>Value</strong> = <em>(Kunci Gemini Anda)</em></li>
+              <li>Klik <strong>Save</strong> lalu lakukan <strong>Redeploy</strong> proyek</li>
+            </ol>
+            <p className="text-[11px] text-amber-800 italic">
+              ✨ Setelah disimpan di Vercel, ARVIN AI akan bekerja otomatis untuk semua pengunjung secara gratis tanpa popup peringatan!
+            </p>
+          </div>
+
           {/* Help box */}
           <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-900 space-y-2">
             <div className="flex items-center gap-1.5 font-bold text-blue-800">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span>Cara Mendapatkan Kunci Gemini Gratis:</span>
+              <Key className="w-4 h-4 text-blue-600" />
+              <span>Atau Gunakan Kunci Sementara di Browser Ini:</span>
             </div>
-            <ol className="list-decimal list-inside space-y-1 text-blue-800/90 leading-relaxed text-[12px]">
+            <p className="text-blue-900/90 text-[12px]">
+              Jika belum mengatur Environment Variable di Vercel, Anda dapat memasukkan kunci pribadi langsung di bawah untuk perangkat ini:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-blue-800/90 leading-relaxed text-[11.5px]">
               <li>Buka Google AI Studio melalui tombol di bawah.</li>
               <li>Klik <strong>Get API key</strong> $\rightarrow$ <strong>Create API key</strong>.</li>
               <li>Salin kunci yang berawalan <code>AIzaSy...</code> lalu tempel di kolom di atas.</li>

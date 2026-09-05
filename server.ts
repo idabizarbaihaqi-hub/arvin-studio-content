@@ -11,6 +11,35 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// CORS headers for all incoming requests and preflight OPTIONS handling
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-gemini-api-key");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
+// Normalize request URL for Vercel rewrites (e.g. if Vercel strips /api prefix)
+app.use((req, _res, next) => {
+  if (req.url && !req.url.startsWith("/api") && !req.url.startsWith("/@") && !req.url.startsWith("/src") && !req.url.startsWith("/node_modules")) {
+    const original = req.url;
+    // Only prepend /api for known api subroutes
+    const apiRoutes = [
+      "/chat", "/analyze", "/ideas", "/captions", "/hooks", "/scripts",
+      "/hashtags", "/content-plans", "/ai-usage", "/history", "/analytics",
+      "/account", "/subscription", "/credits", "/usage-limit", "/auth", "/health"
+    ];
+    if (apiRoutes.some((r) => original.startsWith(r))) {
+      req.url = "/api" + original;
+    }
+  }
+  next();
+});
+
 // Persistent Firestore Collections Store
 const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const dataDir = isVercel ? path.join("/tmp", "arvin_data") : path.join(process.cwd(), "data");
@@ -175,26 +204,11 @@ function logAiHistory(
 
 // Initialize Gemini SDK with User-Agent telemetry
 function getGeminiClient(customApiKey?: string): GoogleGenAI {
-  let apiKey = (customApiKey && customApiKey.trim()) || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-
-  if (!apiKey) {
-    try {
-      const envExamplePath = path.join(process.cwd(), ".env.example");
-      if (fs.existsSync(envExamplePath)) {
-        const lines = fs.readFileSync(envExamplePath, "utf-8").split("\n");
-        for (const line of lines) {
-          if (line.startsWith("GEMINI_API_KEY=") && line.trim().length > 15) {
-            apiKey = line.substring("GEMINI_API_KEY=".length).trim();
-            break;
-          }
-        }
-      }
-    } catch {}
-  }
+  const apiKey = (customApiKey && customApiKey.trim()) || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "GEMINI_API_KEY belum dikonfigurasi. Anda dapat memasukkan API Key melalui menu Input GEMINI_API_KEY di aplikasi atau menyimpannya di Environment Variables Vercel."
+      "GEMINI_API_KEY belum dikonfigurasi di server. Silakan atur GEMINI_API_KEY di Environment Variables Vercel agar aplikasi bekerja otomatis untuk semua pengunjung, atau masukkan API Key sementara melalui menu aplikasi."
     );
   }
   return new GoogleGenAI({
@@ -211,8 +225,9 @@ function getClientApiKey(req: Request): string | undefined {
   const headerKey = req.headers["x-gemini-api-key"] as string;
   if (headerKey && headerKey.trim()) return headerKey.trim();
   const auth = req.headers.authorization;
-  if (auth && auth.toLowerCase().startsWith("bearer aiza")) {
-    return auth.substring(7).trim();
+  if (auth && auth.toLowerCase().startsWith("bearer ")) {
+    const token = auth.substring(7).trim();
+    if (token.length > 10) return token;
   }
   return undefined;
 }
@@ -365,12 +380,13 @@ Gaya Komunikasi:
 - Selalu dukung creator untuk terus berkembang dan bereksperimen.`;
 
 // Candidate models in priority order:
-// 1. gemini-3.1-flash-lite: lowest latency (~1.3s), high availability, avoids 503 high-demand spikes
-// 2. gemini-flash-latest: fast general fallback
-// 3. gemini-3.8-flash: thorough capability fallback
+// Supports both public Google AI Studio keys and AI Studio runtime
 const CANDIDATE_MODELS = [
-  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
   "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
   "gemini-3.8-flash",
 ];
 

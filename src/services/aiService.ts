@@ -50,6 +50,15 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+const CLIENT_CANDIDATE_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
+];
+
 async function directClientGeminiChat(
   apiKey: string,
   messages: Array<Pick<ChatMessage, 'role' | 'text'>>
@@ -70,20 +79,34 @@ async function directClientGeminiChat(
     throw new Error('Pesan tidak boleh kosong.');
   }
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
-    contents: validMessages,
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.7,
-    },
-  });
+  let lastError: any = null;
+  for (const model of CLIENT_CANDIDATE_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: validMessages,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.7,
+        },
+      });
 
-  const reply = response?.text;
-  if (!reply) {
-    throw new Error('Tidak menerima balasan teks dari Gemini AI.');
+      const reply = response?.text;
+      if (reply) {
+        return reply;
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Client Gemini] Model ${model} failed:`, err?.message || err);
+      const msg = err?.message || '';
+      if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
+        throw new Error('API Key Google Gemini yang dimasukkan tidak valid. Periksa kembali di Google AI Studio (aistudio.google.com).');
+      }
+      continue;
+    }
   }
-  return reply;
+
+  throw lastError || new Error('Tidak menerima balasan teks dari Gemini AI.');
 }
 
 /**
