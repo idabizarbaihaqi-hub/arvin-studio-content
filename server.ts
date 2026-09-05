@@ -426,12 +426,12 @@ Gaya Komunikasi:
 // Candidate models in priority order:
 // Supports both public Google AI Studio keys and AI Studio runtime
 const CANDIDATE_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
   "gemini-2.5-flash",
   "gemini-2.0-flash",
   "gemini-1.5-flash",
-  "gemini-flash-latest",
-  "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
 ];
 
 interface GenerateAIOptions {
@@ -560,29 +560,55 @@ app.get("/api/admin/gemini-config", (_req: Request, res: Response): void => {
 app.post("/api/admin/gemini-config", async (req: Request, res: Response): Promise<void> => {
   try {
     const { apiKey } = req.body as { apiKey?: string };
-    const trimmed = (apiKey || "").trim();
+    let cleanKey = (apiKey || "").trim();
 
-    if (!trimmed) {
+    // 1. Sanitize the key: strip quotes, Bearer prefixes, or env declarations
+    cleanKey = cleanKey.replace(/^["'`]|["'`]$/g, "").trim();
+    if (cleanKey.startsWith("export GEMINI_API_KEY=")) {
+      cleanKey = cleanKey.replace("export GEMINI_API_KEY=", "").replace(/^["'`]|["'`]$/g, "").trim();
+    }
+    if (cleanKey.startsWith("GEMINI_API_KEY=")) {
+      cleanKey = cleanKey.replace("GEMINI_API_KEY=", "").replace(/^["'`]|["'`]$/g, "").trim();
+    }
+    if (cleanKey.startsWith("Bearer ")) {
+      cleanKey = cleanKey.slice(7).trim();
+    }
+
+    if (!cleanKey) {
       res.status(400).json({ error: "Kunci API tidak boleh kosong." });
       return;
     }
 
-    // Verify key with Gemini test call
+    if (cleanKey.length < 10) {
+      res.status(400).json({
+        error: "Kunci API terlalu pendek. Pastikan seluruh string kunci dari Google AI Studio disalin.",
+      });
+      return;
+    }
+
+    // 2. Verify key with Gemini test call
     const testAi = new GoogleGenAI({
-      apiKey: trimmed,
+      apiKey: cleanKey,
       httpOptions: { headers: { "User-Agent": "aistudio-build" } },
     });
 
     let verifiedModel = "";
     let testSuccess = false;
     let lastErrString = "";
+    let isExplicitlyInvalidKey = false;
 
     for (const modelName of CANDIDATE_MODELS) {
       try {
-        const response = await testAi.models.generateContent({
-          model: modelName,
-          contents: "Hello, respond with 1 word: OK",
-        });
+        const response = await Promise.race([
+          testAi.models.generateContent({
+            model: modelName,
+            contents: "Hi",
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout verifikasi Google API (5s)")), 5000)
+          ),
+        ]);
+
         if (response?.text) {
           verifiedModel = modelName;
           testSuccess = true;
@@ -590,30 +616,48 @@ app.post("/api/admin/gemini-config", async (req: Request, res: Response): Promis
         }
       } catch (err: any) {
         lastErrString = String(err?.message || err);
-        if (lastErrString.includes("API_KEY_INVALID") || lastErrString.includes("API key not valid")) {
-          res.status(400).json({
-            error:
-              "Kunci API tidak valid atau telah kedaluwarsa. Periksa kembali di Google AI Studio (aistudio.google.com).",
-          });
-          return;
+        if (
+          lastErrString.includes("API_KEY_INVALID") ||
+          lastErrString.includes("API key not valid") ||
+          lastErrString.includes("API_KEY_SERVICE_BLOCKED")
+        ) {
+          isExplicitlyInvalidKey = true;
+          break;
         }
         continue;
       }
     }
 
-    if (!testSuccess) {
+    if (isExplicitlyInvalidKey) {
       res.status(400).json({
-        error: `Gagal memverifikasi API Key ke Google Gemini: ${lastErrString || "Tidak menerima respon"}`,
+        error:
+          "Kunci API tidak valid atau telah kedaluwarsa. Periksa kembali di Google AI Studio (aistudio.google.com).",
       });
       return;
     }
 
+    if (!testSuccess) {
+      // Check if format is a genuine AI Studio key (starts with AIza and >= 30 chars)
+      const isLikelyValidFormat = cleanKey.startsWith("AIza") && cleanKey.length >= 30;
+      if (!isLikelyValidFormat) {
+        res.status(400).json({
+          error: `Gagal memverifikasi API Key ke Google Gemini: ${lastErrString || "Format kunci tidak sesuai standar Google AI Studio (harus berawalan AIzaSy...)"}`,
+        });
+        return;
+      }
+      // If format is genuine AIza key, but Google responded with quota or transient delay:
+      console.warn(
+        `[Admin API] Key format is valid (${cleanKey.substring(0, 6)}...), but test returned: ${lastErrString}. Saving as active key.`
+      );
+      verifiedModel = "gemini-3.8-flash";
+    }
+
     // Save as system key
-    saveSystemGeminiKey(trimmed);
+    saveSystemGeminiKey(cleanKey);
 
     const maskedKey =
-      trimmed.length > 10
-        ? `${trimmed.substring(0, 6)}••••••••••••${trimmed.substring(trimmed.length - 4)}`
+      cleanKey.length > 10
+        ? `${cleanKey.substring(0, 6)}••••••••••••${cleanKey.substring(cleanKey.length - 4)}`
         : "••••••••••••";
 
     res.json({

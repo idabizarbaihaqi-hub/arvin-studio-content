@@ -62,20 +62,35 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
     setKeyNotice(null);
     setKeyError(null);
 
-    const trimmed = inputApiKey.trim();
-    if (!trimmed) {
+    let clean = inputApiKey.trim().replace(/^["'`]|["'`]$/g, '').trim();
+    if (clean.startsWith('export GEMINI_API_KEY=')) {
+      clean = clean.replace('export GEMINI_API_KEY=', '').replace(/^["'`]|["'`]$/g, '').trim();
+    }
+    if (clean.startsWith('GEMINI_API_KEY=')) {
+      clean = clean.replace('GEMINI_API_KEY=', '').replace(/^["'`]|["'`]$/g, '').trim();
+    }
+    if (clean.startsWith('Bearer ')) {
+      clean = clean.slice(7).trim();
+    }
+
+    if (!clean) {
       setKeyError('Harap masukkan kunci API Gemini yang valid (berawalan AIzaSy...).');
       return;
     }
 
+    if (clean.length < 10) {
+      setKeyError('Kunci API terlalu pendek. Pastikan seluruh string API Key dari Google AI Studio disalin.');
+      return;
+    }
+
     if (!currentUser) {
-      setKeyError('Sesi login admin tidak valid.');
+      setKeyError('Sesi login admin tidak valid. Silakan muat ulang halaman atau login kembali.');
       return;
     }
 
     setIsSavingKey(true);
     try {
-      const res = await saveSystemGeminiConfig(trimmed, currentUser);
+      const res = await saveSystemGeminiConfig(clean, currentUser);
       setKeyNotice(res.message || 'Kunci Gemini API berhasil diverifikasi dan disimpan untuk semua pengguna!');
       setInputApiKey('');
       await loadConfig();

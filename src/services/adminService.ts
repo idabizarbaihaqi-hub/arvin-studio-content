@@ -809,8 +809,18 @@ export async function saveSystemGeminiConfig(
   apiKey: string,
   adminUser: UserProfile
 ): Promise<{ success: boolean; message: string; maskedKey?: string; model?: string }> {
-  const trimmed = apiKey.trim();
-  if (!trimmed) {
+  let cleanKey = apiKey.trim().replace(/^["'`]|["'`]$/g, '').trim();
+  if (cleanKey.startsWith('export GEMINI_API_KEY=')) {
+    cleanKey = cleanKey.replace('export GEMINI_API_KEY=', '').replace(/^["'`]|["'`]$/g, '').trim();
+  }
+  if (cleanKey.startsWith('GEMINI_API_KEY=')) {
+    cleanKey = cleanKey.replace('GEMINI_API_KEY=', '').replace(/^["'`]|["'`]$/g, '').trim();
+  }
+  if (cleanKey.startsWith('Bearer ')) {
+    cleanKey = cleanKey.slice(7).trim();
+  }
+
+  if (!cleanKey) {
     throw new Error('Kunci API tidak boleh kosong.');
   }
 
@@ -825,7 +835,7 @@ export async function saveSystemGeminiConfig(
   const res = await fetch('/api/admin/gemini-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey: trimmed }),
+    body: JSON.stringify({ apiKey: cleanKey }),
   });
 
   const data = await res.json();
@@ -835,16 +845,16 @@ export async function saveSystemGeminiConfig(
 
   const masked =
     data.maskedKey ||
-    (trimmed.length > 10
-      ? `${trimmed.substring(0, 6)}••••••••••••${trimmed.substring(trimmed.length - 4)}`
+    (cleanKey.length > 10
+      ? `${cleanKey.substring(0, 6)}••••••••••••${cleanKey.substring(cleanKey.length - 4)}`
       : '••••••••••••');
 
   // 2. Save directly to Firebase Firestore collection 'system_settings', doc 'gemini_config'
   try {
     await setDoc(doc(db, 'system_settings', 'gemini_config'), {
-      apiKey: trimmed,
+      apiKey: cleanKey,
       maskedKey: masked,
-      activeModel: data.model || 'gemini-2.5-flash',
+      activeModel: data.model || 'gemini-3.8-flash',
       storageLocation: 'Firebase Firestore (/system_settings/gemini_config)',
       firestoreDatabaseId: 'ai-studio-arvinstudioconte-b14a93ee-b611-427e-9737-40f31360b37c',
       updatedAt: new Date().toISOString(),
@@ -854,16 +864,25 @@ export async function saveSystemGeminiConfig(
     console.log('[Firestore] Kunci API Gemini berhasil disimpan secara permanen di Firebase Firestore.');
   } catch (err: any) {
     console.error('[Firestore] Gagal menyimpan ke Firebase Firestore:', err);
+    if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
+      throw new Error(
+        `Akses ditolak oleh Firebase Firestore (${err?.code || 'permission-denied'}). Pastikan akun ${adminUser.email} memiliki hak akses Super Admin.`
+      );
+    }
     throw new Error(`Gagal menyimpan ke Firebase Firestore: ${err?.message || err}`);
   }
 
   // 3. Log admin activity in Firestore audit logs
-  await logAdminActivity({
-    adminUser,
-    action: 'UPDATE_SYSTEM_GEMINI_KEY',
-    targetId: 'gemini_config',
-    description: `Super Admin memperbarui Kunci API Gemini Sistem (${masked}) di Firebase Firestore. AI aktif untuk seluruh pengguna.`,
-  });
+  try {
+    await logAdminActivity({
+      adminUser,
+      action: 'UPDATE_SYSTEM_GEMINI_KEY',
+      targetId: 'gemini_config',
+      description: `Super Admin memperbarui Kunci API Gemini Sistem (${masked}) di Firebase Firestore. AI aktif untuk seluruh pengguna.`,
+    });
+  } catch (logErr) {
+    console.warn('[Audit Log] Gagal mencatat log aktivitas admin:', logErr);
+  }
 
   return {
     ...data,

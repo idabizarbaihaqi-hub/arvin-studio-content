@@ -119,7 +119,7 @@ export const AdminProfile: React.FC<AdminProfileProps> = ({ currentUser }) => {
           <div>
             <h4 className="font-bold mb-0.5">Integritas Keamanan Akun Super Admin</h4>
             <p className="text-amber-800 leading-relaxed text-[11px]">
-              Akun dengan email <strong>id.abizarbaihaqi@gmail.com</strong> telah diatur secara permanen sebagai Super Administrator Utama ARVIN STUDIO. Sistem melarang penurunan pangkat (demotion) dan penghapusan akun ini demi menjaga kedaulatan platform.
+              Akun dengan email <strong>{currentUser?.email || 'Super Administrator'}</strong> telah diatur secara permanen sebagai Super Administrator ARVIN STUDIO. Sistem melarang penurunan pangkat (demotion) dan penghapusan akun ini demi menjaga kedaulatan platform.
             </p>
           </div>
         </div>

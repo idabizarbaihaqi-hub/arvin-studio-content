@@ -15,7 +15,10 @@ service cloud.firestore {
     // Helper to check if current user is Super Admin
     function isSuperAdmin() {
       return isAuthenticated() && (
-        (request.auth.token.email != null && request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com') ||
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
+        )) ||
         request.auth.token.superAdmin == true ||
         request.auth.token.role == 'SUPER_ADMIN' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -26,9 +29,12 @@ service cloud.firestore {
     // Match users collection
     match /users/{userId} {
       allow read: if isOwner(userId) || isSuperAdmin();
-      // Regular user creates as USER + FREE + INACTIVE; Primary Super Admin registers as SUPER_ADMIN
+      // Regular user creates as USER + FREE + INACTIVE; Super Admins register as SUPER_ADMIN
       allow create: if isOwner(userId) && (
-        (request.auth.token.email == 'id.abizarbaihaqi@gmail.com' && request.resource.data.role == 'SUPER_ADMIN') ||
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
+        ) && request.resource.data.role == 'SUPER_ADMIN') ||
         (request.resource.data.role == 'USER' && request.resource.data.plan == 'FREE' && request.resource.data.subscriptionStatus == 'INACTIVE')
       );
       // Super Admin can update user (e.g. approve subscription, adjust plan/credits); user can only update own profile fields
@@ -38,8 +44,10 @@ service cloud.firestore {
         request.resource.data.plan == resource.data.plan &&
         request.resource.data.subscriptionStatus == resource.data.subscriptionStatus
       );
-      // Primary Super Admin cannot be deleted
-      allow delete: if isSuperAdmin() && resource.data.email != 'id.abizarbaihaqi@gmail.com';
+      // Primary Super Admins cannot be deleted
+      allow delete: if isSuperAdmin() && 
+        resource.data.email != 'id.abizarbaihaqi@gmail.com' &&
+        resource.data.email != 'id.agnesyakartika@gmail.com';
     }
 
     // Match credit_transactions collection
@@ -110,7 +118,12 @@ service cloud.firestore {
 
     // Match system_settings collection (Super Admin global config, e.g. Gemini AI Key)
     match /system_settings/{settingId} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if isSuperAdmin() || (
+        isAuthenticated() && request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
+        )
+      );
     }
 
     // Deny all other paths

@@ -41,14 +41,23 @@ export const AI_FEATURE_LABELS: Record<AiFeatureKey, string> = {
   'hashtag-generator': 'Hashtag Generator',
 };
 
+export const SUPER_ADMIN_EMAILS = [
+  'id.abizarbaihaqi@gmail.com',
+  'id.agnesyakartika@gmail.com',
+];
 export const PRIMARY_SUPER_ADMIN_EMAIL = 'id.abizarbaihaqi@gmail.com';
+
+export function isSuperAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
 
 export function isSuperAdminUser(user?: UserProfile | null): boolean {
   if (!user) return false;
   return (
     user.role === 'SUPER_ADMIN' ||
     user.adminAccess === true ||
-    (user.email ? user.email.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL.toLowerCase() : false)
+    isSuperAdminEmail(user.email)
   );
 }
 
@@ -86,10 +95,10 @@ export async function registerWithEmail(
   const uid = credential.user.uid;
   const now = new Date().toISOString();
 
-  const isSuperAdmin = cleanEmail === PRIMARY_SUPER_ADMIN_EMAIL.toLowerCase();
+  const isSuperAdmin = isSuperAdminEmail(cleanEmail);
 
   // Initial user document according to strict requirements:
-  // Primary Super Admin is automatically set to SUPER_ADMIN with adminAccess = true
+  // Super Admin is automatically set to SUPER_ADMIN with adminAccess = true
   // Regular users MUST be role = USER, plan = FREE, subscriptionStatus = INACTIVE
   const initialProfile: UserProfile = {
     id: uid,
@@ -98,7 +107,7 @@ export async function registerWithEmail(
     username: cleanUsername || (isSuperAdmin ? 'superadmin' : `creator_${uid.slice(0, 5)}`),
     email: cleanEmail,
     photoURL: '',
-    bio: isSuperAdmin ? 'Primary Super Administrator ARVIN STUDIO' : 'Kreator Konten ARVIN STUDIO',
+    bio: isSuperAdmin ? 'Super Administrator ARVIN STUDIO' : 'Kreator Konten ARVIN STUDIO',
     role: isSuperAdmin ? 'SUPER_ADMIN' : 'USER',
     adminAccess: isSuperAdmin ? true : false,
     plan: isSuperAdmin ? 'PREMIUM' : 'FREE',
@@ -161,10 +170,10 @@ export async function getUserProfile(userId?: string): Promise<UserProfile> {
   if (userSnap.exists()) {
     const data = userSnap.data() as UserProfile;
 
-    // Check if user is Primary Super Admin and enforce role integrity
+    // Check if user is Super Admin and enforce role integrity
     if (
       data.email &&
-      data.email.toLowerCase() === PRIMARY_SUPER_ADMIN_EMAIL.toLowerCase() &&
+      isSuperAdminEmail(data.email) &&
       (data.role !== 'SUPER_ADMIN' || !data.adminAccess)
     ) {
       data.role = 'SUPER_ADMIN';
