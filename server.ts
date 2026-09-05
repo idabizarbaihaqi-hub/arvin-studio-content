@@ -319,13 +319,61 @@ function getClientApiKey(req: Request): string | undefined {
 }
 
 /**
+ * Accurately extracts the first complete balanced JSON object {...} or array [...]
+ * from a string, ignoring any leading text or trailing notes/commentary after the JSON.
+ */
+function extractFirstCompleteJson(str: string): any {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let start = -1;
+
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+
+    if (ch === "{" || ch === "[") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const candidate = str.substring(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          try {
+            const cleaned = candidate.replace(/,\s*([}\]])/g, "$1");
+            return JSON.parse(cleaned);
+          } catch {}
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Safely parse JSON strings returned by LLMs, handling:
  * - Markdown fences (```json ... ```)
- * - Trailing commentary/notes after the JSON closing brace (e.g. line 170 column 1)
+ * - Trailing commentary/notes after the JSON closing brace (e.g. line 79 column 1)
  * - Trailing commas before } or ]
  * - Direct array vs { key: [...] } structures
  */
 function safeJsonParse<T = any>(rawText: string): T {
+  if (!rawText || typeof rawText !== "string") return {} as T;
   const trimmed = rawText.trim();
 
   // 1. Direct parse attempt
@@ -347,7 +395,20 @@ function safeJsonParse<T = any>(rawText: string): T {
     }
   }
 
-  // 3. Slice outermost object {...} - completely ignores any trailing commentary after }
+  // 3. Extract first complete balanced JSON (object or array) - completely ignores trailing commentary!
+  const balanced = extractFirstCompleteJson(trimmed);
+  if (balanced !== null && balanced !== undefined) {
+    return balanced as T;
+  }
+
+  // 4. Scanner for individual objects in stream
+  const extracted = extractObjectsFromStream(trimmed);
+  if (extracted && extracted.length > 0) {
+    if (extracted.length === 1) return extracted[0] as T;
+    return extracted as unknown as T;
+  }
+
+  // 5. Slice outermost object {...}
   const firstBrace = trimmed.indexOf("{");
   const lastBrace = trimmed.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
@@ -362,7 +423,7 @@ function safeJsonParse<T = any>(rawText: string): T {
     }
   }
 
-  // 4. Slice outermost array [...]
+  // 6. Slice outermost array [...]
   const firstBracket = trimmed.indexOf("[");
   const lastBracket = trimmed.lastIndexOf("]");
   if (firstBracket !== -1 && lastBracket > firstBracket) {
@@ -377,21 +438,13 @@ function safeJsonParse<T = any>(rawText: string): T {
     }
   }
 
-  // 5. Fallback with global backtick removal
+  // 7. Last resort: try stripped text without backticks
   const cleanedText = trimmed.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
-  const cFirstBrace = cleanedText.indexOf("{");
-  const cLastBrace = cleanedText.lastIndexOf("}");
-  if (cFirstBrace !== -1 && cLastBrace > cFirstBrace) {
-    const candidate = cleanedText.substring(cFirstBrace, cLastBrace + 1);
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      const fixed = candidate.replace(/,\s*([}\]])/g, "$1");
-      return JSON.parse(fixed);
-    }
+  try {
+    return JSON.parse(cleanedText);
+  } catch {
+    return {} as T;
   }
-
-  return JSON.parse(cleanedText);
 }
 
 /**
@@ -1532,7 +1585,13 @@ Kembalikan hanya JSON murni sesuai instruksi.`;
       rawJsonText = rawJsonText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
     }
 
-    let parsedData: any = safeJsonParse(rawJsonText);
+    let parsedData: any = null;
+    try {
+      parsedData = safeJsonParse(rawJsonText);
+    } catch {
+      parsedData = null;
+    }
+
     if (!parsedData || !Array.isArray(parsedData.hooks) || parsedData.hooks.length === 0) {
       const extracted = extractObjectsFromStream(rawJsonText);
       if (extracted && extracted.length > 0) {
