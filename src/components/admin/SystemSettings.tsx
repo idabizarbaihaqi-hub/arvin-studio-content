@@ -239,6 +239,19 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
           </div>
         )}
 
+        {/* Info Box: Penjelasan Perbedaan Kunci Firebase vs Kunci Gemini */}
+        <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-1.5">
+          <div className="font-bold flex items-center gap-1.5 text-amber-900">
+            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>Penting: Perbedaan Web API Key Firebase vs Gemini API Key</span>
+          </div>
+          <p className="text-[11px] text-amber-900 leading-relaxed">
+            • <strong>Web API Key di Firebase Console</strong> (berawalan <code>AIzaSy...</code>): Digunakan khusus untuk database Firestore dan sistem Login akun. Jangan dimasukkan di sini karena Firebase API Key tidak memiliki akses ke kecerdasan buatan Google Gemini.
+            <br />
+            • <strong>Gemini API Key (Kecerdasan Buatan)</strong>: Diambil secara gratis dari <strong>Google AI Studio</strong> (bukan dari Firebase). Format kunci resmi dari Google AI Studio bisa berawalan <code>AIzaSy...</code> ataupun <code>AQ...</code> (kunci yang Anda simpan saat ini <code>{geminiConfig?.maskedKey || 'AQ.Ab8RN6...'}</code> sudah valid dan terhubung).
+          </p>
+        </div>
+
         {/* Feedback alerts */}
         {keyNotice && (
           <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-medium">
@@ -267,7 +280,7 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
               type={showApiKey ? 'text' : 'password'}
               value={inputApiKey}
               onChange={(e) => setInputApiKey(e.target.value)}
-              placeholder="AIzaSy..."
+              placeholder="AIzaSy... atau AQ.Ab8..."
               className="w-full pl-10 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
             />
             <button
@@ -349,13 +362,13 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
 
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
             <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-slate-700">Google Gemini Flash</span>
+              <span className="font-semibold text-slate-700">Google Gemini AI</span>
               <span className={`w-2 h-2 rounded-full ${geminiConfig?.configured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
             </div>
             <div className="text-emerald-700 font-bold text-[11px]">
-              {geminiConfig?.configured ? 'GEMINI 2.5 FLASH AKTIF' : 'MENUNGGU KUNCI'}
+              {geminiConfig?.configured ? 'GEMINI 3.1 FLASH-LITE AKTIF' : 'MENUNGGU KUNCI'}
             </div>
-            <div className="text-[10px] text-slate-600 mt-1">Server-side secure proxy</div>
+            <div className="text-[10px] text-slate-600 mt-1">Server-side proxy aman</div>
           </div>
         </div>
       </div>

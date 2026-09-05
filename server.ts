@@ -271,7 +271,8 @@ function getClientApiKey(req: Request): string | undefined {
   const auth = req.headers.authorization;
   if (auth && auth.toLowerCase().startsWith("bearer ")) {
     const token = auth.substring(7).trim();
-    if (token.length > 10) return token;
+    // Do not confuse Firebase Auth JWT (which starts with 'eyJ') with a Gemini API Key
+    if (token.length > 10 && !token.startsWith("eyJ")) return token;
   }
   return undefined;
 }
@@ -425,13 +426,12 @@ Gaya Komunikasi:
 
 // Candidate models in priority order:
 // Supports both public Google AI Studio keys and AI Studio runtime
+// Using current active official models (gemini-3.1-flash-lite has optimal free-tier throughput)
 const CANDIDATE_MODELS = [
+  "gemini-3.1-flash-lite",
   "gemini-3.8-flash",
   "gemini-flash-latest",
-  "gemini-3.1-flash-lite",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
+  "gemini-3.1-pro-preview",
 ];
 
 interface GenerateAIOptions {
@@ -492,7 +492,8 @@ async function generateAIContentWithFallback(
           err?.status === 429 ||
           err?.code === 429 ||
           errString.includes("429") ||
-          errString.includes("RESOURCE_EXHAUSTED");
+          errString.includes("RESOURCE_EXHAUSTED") ||
+          errString.includes("quota");
 
         console.warn(
           `[ARVIN AI] Model ${modelName} (${endpointName}) attempt ${attempt + 1} notice: ${
@@ -500,7 +501,12 @@ async function generateAIContentWithFallback(
           }`
         );
 
-        if ((is503 || is429) && attempt === 0) {
+        // If rate limit / quota exceeded on this model, immediately try next model instead of retrying same model
+        if (is429) {
+          break;
+        }
+
+        if (is503 && attempt === 0) {
           await new Promise((resolve) => setTimeout(resolve, 600));
           continue;
         }
@@ -522,6 +528,20 @@ async function generateAIContentWithFallback(
     );
     highDemandError.status = 503;
     throw highDemandError;
+  }
+
+  if (
+    lastError?.status === 429 ||
+    lastError?.code === 429 ||
+    lastErrString.includes("429") ||
+    lastErrString.includes("RESOURCE_EXHAUSTED") ||
+    lastErrString.includes("quota")
+  ) {
+    const quotaError: any = new Error(
+      "Batas kuota harian API Gemini gratis sedang mencapai batas dari Google. Silakan coba beberapa saat lagi atau gunakan kunci Google AI Studio baru."
+    );
+    quotaError.status = 429;
+    throw quotaError;
   }
 
   throw lastError || new Error("Semua model AI sedang sibuk. Silakan coba beberapa saat lagi.");
