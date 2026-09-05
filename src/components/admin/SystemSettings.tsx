@@ -248,7 +248,7 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
           <p className="text-[11px] text-amber-900 leading-relaxed">
             • <strong>Web API Key di Firebase Console</strong> (berawalan <code>AIzaSy...</code>): Digunakan khusus untuk database Firestore dan sistem Login akun. Jangan dimasukkan di sini karena Firebase API Key tidak memiliki akses ke kecerdasan buatan Google Gemini.
             <br />
-            • <strong>Gemini API Key (Kecerdasan Buatan)</strong>: Diambil secara gratis dari <strong>Google AI Studio</strong> (bukan dari Firebase). Format kunci resmi dari Google AI Studio bisa berawalan <code>AIzaSy...</code> ataupun <code>AQ...</code> (kunci yang Anda simpan saat ini <code>{geminiConfig?.maskedKey || 'AQ.Ab8RN6...'}</code> sudah valid dan terhubung).
+            • <strong>Gemini API Key (Kecerdasan Buatan)</strong>: Diambil secara gratis dari <strong>Google AI Studio</strong> (bukan dari Firebase). Format kunci resmi dari Google AI Studio bisa berawalan <code>AIzaSy...</code> ataupun <code>AQ...</code> (kunci yang Anda simpan saat ini <code>{geminiConfig?.maskedKey || 'Tersimpan'}</code> sudah valid dan terhubung).
           </p>
         </div>
 
@@ -280,7 +280,7 @@ export const SystemSettings: React.FC<SystemSettingsProps> = ({ currentUser }) =
               type={showApiKey ? 'text' : 'password'}
               value={inputApiKey}
               onChange={(e) => setInputApiKey(e.target.value)}
-              placeholder="AIzaSy... atau AQ.Ab8..."
+              placeholder="AIzaSy... atau AQ..."
               className="w-full pl-10 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
             />
             <button

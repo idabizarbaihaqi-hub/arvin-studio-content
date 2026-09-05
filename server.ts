@@ -23,18 +23,26 @@ app.use((req, res, next) => {
   next();
 });
 
-// Normalize request URL for Vercel rewrites (e.g. if Vercel strips /api prefix)
+// Normalize request URL for Vercel rewrites and serverless proxy
 app.use((req, _res, next) => {
-  if (req.url && !req.url.startsWith("/api") && !req.url.startsWith("/@") && !req.url.startsWith("/src") && !req.url.startsWith("/node_modules")) {
-    const original = req.url;
-    // Only prepend /api for known api subroutes
+  const matchedPath = (req.headers["x-matched-path"] || req.headers["x-forwarded-uri"] || req.headers["x-original-url"]) as string | undefined;
+  if (matchedPath && matchedPath.startsWith("/api/")) {
+    req.url = matchedPath;
+  } else if (req.url === "/api" || req.url === "/api/" || req.url.startsWith("/api?")) {
+    const q = (req.query as Record<string, any>) || {};
+    const subpath = q.path || q["0"] || (Array.isArray(q.slug) ? q.slug.join("/") : q.slug);
+    if (subpath && typeof subpath === "string") {
+      req.url = `/api/${subpath.replace(/^\//, "")}`;
+    }
+  } else if (req.url && !req.url.startsWith("/api") && !req.url.startsWith("/@") && !req.url.startsWith("/src") && !req.url.startsWith("/node_modules")) {
+    const original = req.url.split("?")[0];
     const apiRoutes = [
       "/chat", "/analyze", "/ideas", "/captions", "/hooks", "/scripts",
       "/hashtags", "/content-plans", "/ai-usage", "/history", "/analytics",
-      "/account", "/subscription", "/credits", "/usage-limit", "/auth", "/health"
+      "/account", "/subscription", "/credits", "/usage-limit", "/auth", "/health", "/admin"
     ];
     if (apiRoutes.some((r) => original.startsWith(r))) {
-      req.url = "/api" + original;
+      req.url = "/api" + req.url;
     }
   }
   next();
@@ -208,13 +216,36 @@ let systemGeminiApiKey: string | null = null;
 
 function initSystemGeminiKey(): void {
   try {
-    if (fs.existsSync(SYSTEM_CONFIG_PATH)) {
-      const raw = fs.readFileSync(SYSTEM_CONFIG_PATH, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed.geminiApiKey && typeof parsed.geminiApiKey === "string" && parsed.geminiApiKey.trim()) {
-        systemGeminiApiKey = parsed.geminiApiKey.trim();
-        console.log("[Server] Loaded System Gemini API Key from persistent storage.");
+    const candidatePaths = [
+      SYSTEM_CONFIG_PATH,
+      path.join(process.cwd(), "data", "system_config.json"),
+      path.join(process.cwd(), "dist", "data", "system_config.json"),
+      path.join("/tmp", "arvin_data", "system_config.json"),
+    ];
+
+    for (const filePath of candidatePaths) {
+      if (fs.existsSync(filePath)) {
+        try {
+          const raw = fs.readFileSync(filePath, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed.geminiApiKey && typeof parsed.geminiApiKey === "string" && parsed.geminiApiKey.trim()) {
+            systemGeminiApiKey = parsed.geminiApiKey.trim();
+            console.log(`[Server] Loaded System Gemini API Key from ${filePath}`);
+            return;
+          }
+        } catch {}
       }
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      systemGeminiApiKey = process.env.GEMINI_API_KEY.trim();
+      console.log("[Server] Loaded System Gemini API Key from GEMINI_API_KEY environment variable.");
+      return;
+    }
+    if (process.env.VITE_GEMINI_API_KEY && process.env.VITE_GEMINI_API_KEY.trim()) {
+      systemGeminiApiKey = process.env.VITE_GEMINI_API_KEY.trim();
+      console.log("[Server] Loaded System Gemini API Key from VITE_GEMINI_API_KEY environment variable.");
+      return;
     }
   } catch (err) {
     console.warn("[Server] Failed to load system config:", err);
@@ -224,19 +255,29 @@ initSystemGeminiKey();
 
 function saveSystemGeminiKey(apiKey: string | null): void {
   try {
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
     systemGeminiApiKey = apiKey ? apiKey.trim() : null;
-    let config: any = {};
-    if (fs.existsSync(SYSTEM_CONFIG_PATH)) {
+    const targetPaths = [
+      SYSTEM_CONFIG_PATH,
+      path.join(process.cwd(), "data", "system_config.json"),
+    ];
+
+    for (const targetPath of targetPaths) {
       try {
-        config = JSON.parse(fs.readFileSync(SYSTEM_CONFIG_PATH, "utf-8"));
+        const dir = path.dirname(targetPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        let config: any = {};
+        if (fs.existsSync(targetPath)) {
+          try {
+            config = JSON.parse(fs.readFileSync(targetPath, "utf-8"));
+          } catch {}
+        }
+        config.geminiApiKey = systemGeminiApiKey;
+        config.updatedAt = new Date().toISOString();
+        fs.writeFileSync(targetPath, JSON.stringify(config, null, 2), "utf-8");
       } catch {}
     }
-    config.geminiApiKey = systemGeminiApiKey;
-    config.updatedAt = new Date().toISOString();
-    fs.writeFileSync(SYSTEM_CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
   } catch (err) {
     console.error("[Server] Failed to save system config:", err);
   }

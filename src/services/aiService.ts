@@ -1,4 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { getStoredApiKey } from './apiKeyService';
 import {
   ChatMessage,
@@ -107,6 +109,32 @@ async function directClientGeminiChat(
   throw lastError || new Error('Tidak menerima balasan teks dari Gemini AI.');
 }
 
+let cachedFirestoreKey: string | null = null;
+
+export async function getEffectiveApiKey(): Promise<string> {
+  // 1. Check custom user key or VITE_ env key
+  const stored = getStoredApiKey();
+  if (stored) return stored;
+
+  if (cachedFirestoreKey) return cachedFirestoreKey;
+
+  // 2. Query Firestore system_settings/gemini_config
+  try {
+    const snap = await getDoc(doc(db, 'system_settings', 'gemini_config'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data?.apiKey && typeof data.apiKey === 'string' && data.apiKey.trim()) {
+        cachedFirestoreKey = data.apiKey.trim();
+        return cachedFirestoreKey;
+      }
+    }
+  } catch (err) {
+    console.warn('[AI Service] Tidak dapat membaca kunci dari Firestore:', err);
+  }
+
+  return '';
+}
+
 /**
  * AI Service for ARVIN STUDIO
  * Resilient dual-layer: Server-side API with automatic client-side Gemini SDK fallback
@@ -114,7 +142,6 @@ async function directClientGeminiChat(
 export async function sendChatMessage(
   messages: Array<Pick<ChatMessage, 'role' | 'text'>>
 ): Promise<string> {
-  const userApiKey = getStoredApiKey();
   const headers = getAuthHeaders();
 
   const payloadMessages = messages.map((m) => ({
@@ -144,10 +171,15 @@ export async function sendChatMessage(
         if (errorData?.error) serverErrorMsg = errorData.error;
       } catch {}
 
-      // If server returned error but client has an API key, use direct client SDK
-      if (userApiKey) {
-        console.warn('Server /api/chat error (status ' + response.status + '). Menggunakan fallback langsung Gemini SDK di browser.');
-        return await directClientGeminiChat(userApiKey, messages);
+      // Fallback directly to client Gemini SDK if server fails (e.g. serverless proxy, status 500, etc.)
+      console.warn(`[ARVIN AI] Server /api/chat error (status ${response.status}). Mengaktifkan fallback langsung Gemini SDK di browser...`);
+      try {
+        const effectiveKey = await getEffectiveApiKey();
+        if (effectiveKey) {
+          return await directClientGeminiChat(effectiveKey, messages);
+        }
+      } catch (fallbackErr: any) {
+        console.error('[ARVIN AI] Client fallback error:', fallbackErr);
       }
 
       if (serverErrorMsg) {
@@ -159,13 +191,14 @@ export async function sendChatMessage(
     }
   } catch (error: any) {
     // 2. Network/fetch failure (e.g. static host without serverless functions, offline, etc.)
-    if (userApiKey) {
-      console.warn('Gagal menghubungi /api/chat. Menggunakan fallback langsung Gemini SDK di browser.');
-      try {
-        return await directClientGeminiChat(userApiKey, messages);
-      } catch (clientErr: any) {
-        throw new Error(clientErr?.message || 'Gagal menghubungi Gemini AI.');
+    console.warn('[ARVIN AI] Server /api/chat tidak dapat dihubungi. Mengaktifkan fallback langsung Gemini SDK di browser...');
+    try {
+      const effectiveKey = await getEffectiveApiKey();
+      if (effectiveKey) {
+        return await directClientGeminiChat(effectiveKey, messages);
       }
+    } catch (clientErr: any) {
+      throw new Error(clientErr?.message || 'Gagal menghubungi Gemini AI.');
     }
 
     const message = error?.message || '';

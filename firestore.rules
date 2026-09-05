@@ -118,7 +118,8 @@ service cloud.firestore {
 
     // Match system_settings collection (Super Admin global config, e.g. Gemini AI Key)
     match /system_settings/{settingId} {
-      allow read, write: if isSuperAdmin() || (
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || (
         isAuthenticated() && request.auth.token.email != null && (
           request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
           request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
