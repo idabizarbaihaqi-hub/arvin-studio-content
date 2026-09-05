@@ -45,9 +45,26 @@ export async function sendChatMessage(
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || 'Terjadi masalah saat menghubungkan ke ARVIN AI.';
+      let errorMessage = '';
+      try {
+        const errorData = await response.json();
+        if (errorData?.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // Not JSON
+      }
+
+      if (!errorMessage) {
+        if (response.status === 404) {
+          errorMessage = 'Layanan AI /api/chat tidak dapat diakses (404). Silakan pastikan deploy Vercel telah menyertakan fungsi API.';
+        } else if (response.status === 503) {
+          errorMessage = 'Layanan AI sedang sibuk. Silakan coba sesaat lagi.';
+        } else {
+          errorMessage = `Terjadi masalah saat menghubungkan ke ARVIN AI (Status ${response.status}).`;
+        }
+      }
+
       throw new Error(errorMessage);
     }
 

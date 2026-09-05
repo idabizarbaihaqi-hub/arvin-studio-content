@@ -109,6 +109,21 @@ export async function getAdminStats(): Promise<AdminDashboardMetrics> {
       totalAiUsage += typeof data.count === 'number' ? data.count : 1;
     });
 
+    // 4. Payment Accounts count
+    let totalPaymentAccounts = 0;
+    let activePaymentAccounts = 0;
+    try {
+      const paymentAccountsSnap = await getDocs(collection(db, 'payment_accounts'));
+      paymentAccountsSnap.forEach((docSnap) => {
+        totalPaymentAccounts++;
+        if (docSnap.data().isActive === true) {
+          activePaymentAccounts++;
+        }
+      });
+    } catch {
+      // Non-critical if user doesn't have permissions yet
+    }
+
     return {
       totalUsers,
       freeUsers,
@@ -117,6 +132,8 @@ export async function getAdminStats(): Promise<AdminDashboardMetrics> {
       totalAiUsage,
       activeSubscriptions,
       revenue,
+      totalPaymentAccounts,
+      activePaymentAccounts,
     };
   } catch (err) {
     console.error('Error fetching admin metrics from Firestore:', err);
@@ -128,6 +145,8 @@ export async function getAdminStats(): Promise<AdminDashboardMetrics> {
       totalAiUsage: 0,
       activeSubscriptions: 0,
       revenue: 0,
+      totalPaymentAccounts: 0,
+      activePaymentAccounts: 0,
     };
   }
 }

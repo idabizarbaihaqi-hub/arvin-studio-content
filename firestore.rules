@@ -103,10 +103,8 @@ service cloud.firestore {
 
     // Match payment_accounts collection
     match /payment_accounts/{accountId} {
-      // Authenticated users can read active accounts, Super Admin can read all
-      allow get: if isAuthenticated() && (resource == null || resource.data.isActive == true || isSuperAdmin());
-      allow list: if isAuthenticated() && (resource.data.isActive == true || isSuperAdmin());
-      // Only Super Admin can create, update, delete, enable, disable
+      // Allow read publicly for checkout/transfer instructions; write restricted to Super Admin
+      allow read: if true;
       allow create, update, delete: if isSuperAdmin();
     }
 

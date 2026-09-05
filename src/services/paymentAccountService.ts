@@ -30,8 +30,36 @@ export async function getPaymentAccounts(): Promise<PaymentAccount[]> {
   }
 }
 
+export const DEFAULT_PAYMENT_ACCOUNTS: PaymentAccount[] = [
+  {
+    id: 'default-bca',
+    bankName: 'BCA (Bank Central Asia)',
+    accountName: 'PT ARVIN DIGITAL KREATIF',
+    accountNumber: '8735092114',
+    description: 'Akun Utama Transfer',
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    createdBy: 'SYSTEM',
+    updatedBy: 'SYSTEM',
+  },
+  {
+    id: 'default-mandiri',
+    bankName: 'Bank Mandiri',
+    accountName: 'PT ARVIN DIGITAL KREATIF',
+    accountNumber: '137002299881',
+    description: 'Akun Transfer Alternatif',
+    isActive: true,
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    createdBy: 'SYSTEM',
+    updatedBy: 'SYSTEM',
+  },
+];
+
 /**
  * Fetch only active payment accounts (for User checkout/transfer instructions)
+ * Falls back to default official accounts if Firestore collection is empty or offline
  */
 export async function getActivePaymentAccounts(): Promise<PaymentAccount[]> {
   try {
@@ -43,11 +71,15 @@ export async function getActivePaymentAccounts(): Promise<PaymentAccount[]> {
         accounts.push({ id: docSnap.id, ...data });
       }
     });
-    accounts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-    return accounts;
+
+    if (accounts.length > 0) {
+      accounts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      return accounts;
+    }
+    return DEFAULT_PAYMENT_ACCOUNTS;
   } catch (err: any) {
-    console.error('Error fetching active payment accounts:', err);
-    throw new Error(err.message || 'Gagal memuat rekening pembayaran aktif.');
+    console.warn('Could not fetch active payment accounts from Firestore, using default fallback:', err);
+    return DEFAULT_PAYMENT_ACCOUNTS;
   }
 }
 

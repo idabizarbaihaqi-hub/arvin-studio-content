@@ -12,7 +12,9 @@ const PORT = 3000;
 app.use(express.json());
 
 // Persistent Firestore Collections Store
-const DB_FILE_PATH = path.join(process.cwd(), "data", "firestore_db.json");
+const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const dataDir = isVercel ? path.join("/tmp", "arvin_data") : path.join(process.cwd(), "data");
+const DB_FILE_PATH = path.join(dataDir, "firestore_db.json");
 
 interface FirestoreMockDb {
   content_plans: Record<string, any>;
@@ -27,9 +29,13 @@ interface FirestoreMockDb {
 const DEFAULT_CREATOR_UID = "usr_agnesya_creator";
 const DEFAULT_CREATOR_EMAIL = "id.agnesyakartika@gmail.com";
 
+let inMemoryDbCache: FirestoreMockDb | null = null;
+
 function getDatabase(): FirestoreMockDb {
+  if (inMemoryDbCache) {
+    return inMemoryDbCache;
+  }
   try {
-    const dataDir = path.join(process.cwd(), "data");
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
@@ -113,14 +119,14 @@ function getDatabase(): FirestoreMockDb {
 }
 
 function saveDatabase(db: FirestoreMockDb) {
+  inMemoryDbCache = db;
   try {
-    const dataDir = path.join(process.cwd(), "data");
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf-8");
   } catch (err) {
-    console.error("[Firestore DB] Error writing DB file:", err);
+    console.warn("[Firestore DB] Warning writing DB file (using in-memory cache):", err);
   }
 }
 
@@ -169,9 +175,27 @@ function logAiHistory(
 
 // Initialize Gemini SDK with User-Agent telemetry
 function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  let apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
+    try {
+      const envExamplePath = path.join(process.cwd(), ".env.example");
+      if (fs.existsSync(envExamplePath)) {
+        const lines = fs.readFileSync(envExamplePath, "utf-8").split("\n");
+        for (const line of lines) {
+          if (line.startsWith("GEMINI_API_KEY=") && line.trim().length > 15) {
+            apiKey = line.substring("GEMINI_API_KEY=".length).trim();
+            break;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY belum dikonfigurasi. Silakan tambahkan GEMINI_API_KEY pada Environment Variables Vercel."
+    );
   }
   return new GoogleGenAI({
     apiKey,
@@ -2539,15 +2563,24 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ARVIN STUDIO Server running on http://0.0.0.0:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`ARVIN STUDIO Server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export { app };
+export default app;
