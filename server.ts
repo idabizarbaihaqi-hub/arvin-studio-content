@@ -25,9 +25,17 @@ app.use((req, res, next) => {
 
 // Normalize request URL for Vercel rewrites and serverless proxy
 app.use((req, _res, next) => {
-  const matchedPath = (req.headers["x-matched-path"] || req.headers["x-forwarded-uri"] || req.headers["x-original-url"]) as string | undefined;
+  const matchedPath = (
+    req.headers["x-matched-path"] ||
+    req.headers["x-forwarded-uri"] ||
+    req.headers["x-original-url"] ||
+    req.headers["x-vercel-matched-path"]
+  ) as string | undefined;
+
   if (matchedPath && matchedPath.startsWith("/api/")) {
     req.url = matchedPath;
+  } else if (req.originalUrl && req.originalUrl.startsWith("/api/")) {
+    req.url = req.originalUrl;
   } else if (req.url === "/api" || req.url === "/api/" || req.url.startsWith("/api?")) {
     const q = (req.query as Record<string, any>) || {};
     const subpath = q.path || q["0"] || (Array.isArray(q.slug) ? q.slug.join("/") : q.slug);
