@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sparkles, RefreshCw, Info, CheckCircle2, User, Settings as SettingsIcon } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Info, CheckCircle2, User, Settings as SettingsIcon, Key } from 'lucide-react';
 import { AsLogo } from './AsLogo';
 import { ActiveView } from '../types';
 
@@ -9,6 +9,7 @@ interface OptionsMenuModalProps {
   onNewChat: () => void;
   messageCount: number;
   onNavigate?: (view: ActiveView) => void;
+  onOpenApiKeyModal?: () => void;
 }
 
 export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
@@ -17,6 +18,7 @@ export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
   onNewChat,
   messageCount,
   onNavigate,
+  onOpenApiKeyModal,
 }) => {
   if (!isOpen) return null;
 
@@ -57,6 +59,23 @@ export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
           >
             <RefreshCw className="w-4 h-4 text-slate-600" />
             <span>Mulai Chat Baru</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenApiKeyModal) onOpenApiKeyModal();
+              onClose();
+            }}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100/80 border border-amber-200/70 transition-colors text-left cursor-pointer"
+          >
+            <span className="flex items-center gap-2.5">
+              <Key className="w-4 h-4 text-amber-600" />
+              <span>Input GEMINI_API_KEY</span>
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-sm bg-amber-200/60 text-amber-800 font-bold">
+              Kunci
+            </span>
           </button>
 
           {onNavigate && (
@@ -102,7 +121,7 @@ export const OptionsMenuModal: React.FC<OptionsMenuModalProps> = ({
               </span>
               <span className="font-semibold text-emerald-600 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
-                Terhubung
+                Siap
               </span>
             </div>
           </div>

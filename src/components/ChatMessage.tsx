@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Markdown from 'react-markdown';
-import { Copy, Check, RefreshCw, AlertCircle } from 'lucide-react';
+import { Copy, Check, RefreshCw, AlertCircle, Key } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../types';
 import { AsLogo } from './AsLogo';
 
@@ -8,12 +8,14 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onRetry?: () => void;
   isLast?: boolean;
+  onOpenApiKeyModal?: () => void;
 }
 
 export const ChatMessageItem: React.FC<ChatMessageProps> = ({
   message,
   onRetry,
   isLast,
+  onOpenApiKeyModal,
 }) => {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
@@ -72,17 +74,30 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
             <p className="text-sm text-red-800 leading-relaxed mb-3">
               {message.text}
             </p>
-            {onRetry && isLast && (
-              <button
-                id="btn-retry-chat"
-                type="button"
-                onClick={onRetry}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors shadow-xs"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Coba Lagi</span>
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {onRetry && isLast && (
+                <button
+                  id="btn-retry-chat"
+                  type="button"
+                  onClick={onRetry}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Coba Lagi</span>
+                </button>
+              )}
+              {onOpenApiKeyModal && (
+                <button
+                  id="btn-open-api-key-from-error"
+                  type="button"
+                  onClick={onOpenApiKeyModal}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-red-200 hover:bg-red-100 text-red-900 text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+                >
+                  <Key className="w-3.5 h-3.5 text-red-600" />
+                  <span>Input GEMINI_API_KEY</span>
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="group relative bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-sm shadow-slate-200/50">

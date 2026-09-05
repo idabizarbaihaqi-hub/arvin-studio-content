@@ -1,3 +1,5 @@
+import { GoogleGenAI } from '@google/genai';
+import { getStoredApiKey } from './apiKeyService';
 import {
   ChatMessage,
   ContentAnalysisResult,
@@ -21,67 +23,141 @@ export interface ChatServiceResponse {
   error?: string;
 }
 
+const SYSTEM_INSTRUCTION = `Anda adalah ARVIN AI, asisten strategi dan produksi konten digital profesional untuk ARVIN STUDIO (dikembangkan untuk membantu content creator, pembuat video, copywriter, dan solopreneur di Indonesia).
+Fokus utama Anda adalah membantu:
+1. Ideasi & perumusan sudut pandang (angle) konten yang segar, kreatif, dan anti-mainstream.
+2. Hook 3 detik pertama yang mematikan dan efektif menghentikan scroll di TikTok, Instagram Reels, dan YouTube Shorts.
+3. Struktur naskah/script konten yang menahan watch-time tinggi (Hook - Story/Value - Climax - Call to Action).
+4. Caption memikat yang memicu interaksi (likes, komentar, saves, shares).
+5. Riset hashtag bertarget dan strategi pertumbuhan audiens organik.
+6. Evaluasi dan kurasi draf konten agar siap diproduksi.
+
+Gaya Komunikasi:
+- Nada bicara: Cerdas, berenergi, solutif, empatik, dan suportif.
+- Gunakan Bahasa Indonesia yang natural, modern, ringkas, dan relevan dengan tren konten masa kini.
+- Gunakan pemformatan teks yang rapi (headings, poin-poin tebal, langkah terurut, atau tabel jika relevan).
+- Selalu dukung creator untuk terus berkembang dan bereksperimen.`;
+
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const key = getStoredApiKey();
+  if (key) {
+    headers['x-gemini-api-key'] = key;
+    headers['Authorization'] = `Bearer ${key}`;
+  }
+  return headers;
+}
+
+async function directClientGeminiChat(
+  apiKey: string,
+  messages: Array<Pick<ChatMessage, 'role' | 'text'>>
+): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey });
+  const validMessages = messages
+    .filter((m) => m && (m.text || '').trim().length > 0)
+    .map((m) => ({
+      role: m.role === 'model' ? ('model' as const) : ('user' as const),
+      parts: [{ text: m.text }],
+    }));
+
+  while (validMessages.length > 0 && validMessages[0].role !== 'user') {
+    validMessages.shift();
+  }
+
+  if (validMessages.length === 0) {
+    throw new Error('Pesan tidak boleh kosong.');
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.8-flash',
+    contents: validMessages,
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+      temperature: 0.7,
+    },
+  });
+
+  const reply = response?.text;
+  if (!reply) {
+    throw new Error('Tidak menerima balasan teks dari Gemini AI.');
+  }
+  return reply;
+}
+
 /**
  * AI Service for ARVIN STUDIO
- * Direct real connection to backend Gemini service
+ * Resilient dual-layer: Server-side API with automatic client-side Gemini SDK fallback
  */
 export async function sendChatMessage(
   messages: Array<Pick<ChatMessage, 'role' | 'text'>>
 ): Promise<string> {
-  // Only send legitimate user and model messages
+  const userApiKey = getStoredApiKey();
+  const headers = getAuthHeaders();
+
   const payloadMessages = messages.map((m) => ({
     role: m.role,
     text: m.text,
     content: m.text,
   }));
 
+  // 1. Try server-side route first
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({ messages: payloadMessages }),
     });
 
-    if (!response.ok) {
-      let errorMessage = '';
+    if (response.ok) {
+      const data: ChatServiceResponse = await response.json();
+      const replyText = data.reply || data.content;
+      if (replyText) {
+        return replyText;
+      }
+    } else {
+      let serverErrorMsg = '';
       try {
         const errorData = await response.json();
-        if (errorData?.error) {
-          errorMessage = errorData.error;
-        }
-      } catch {
-        // Not JSON
+        if (errorData?.error) serverErrorMsg = errorData.error;
+      } catch {}
+
+      // If server returned error but client has an API key, use direct client SDK
+      if (userApiKey) {
+        console.warn('Server /api/chat error (status ' + response.status + '). Menggunakan fallback langsung Gemini SDK di browser.');
+        return await directClientGeminiChat(userApiKey, messages);
       }
 
-      if (!errorMessage) {
-        if (response.status === 404) {
-          errorMessage = 'Layanan AI /api/chat tidak dapat diakses (404). Silakan pastikan deploy Vercel telah menyertakan fungsi API.';
-        } else if (response.status === 503) {
-          errorMessage = 'Layanan AI sedang sibuk. Silakan coba sesaat lagi.';
-        } else {
-          errorMessage = `Terjadi masalah saat menghubungkan ke ARVIN AI (Status ${response.status}).`;
-        }
+      if (serverErrorMsg) {
+        throw new Error(serverErrorMsg);
       }
-
-      throw new Error(errorMessage);
+      throw new Error(
+        `Layanan AI tidak dapat diakses (Status ${response.status}). Silakan atur API Key melalui tombol "Input GEMINI_API_KEY".`
+      );
+    }
+  } catch (error: any) {
+    // 2. Network/fetch failure (e.g. static host without serverless functions, offline, etc.)
+    if (userApiKey) {
+      console.warn('Gagal menghubungi /api/chat. Menggunakan fallback langsung Gemini SDK di browser.');
+      try {
+        return await directClientGeminiChat(userApiKey, messages);
+      } catch (clientErr: any) {
+        throw new Error(clientErr?.message || 'Gagal menghubungi Gemini AI dengan API Key yang tersimpan.');
+      }
     }
 
-    const data: ChatServiceResponse = await response.json();
-    const replyText = data.reply || data.content;
-    if (!replyText) {
-      throw new Error('AI tidak dapat terhubung. Silakan coba lagi.');
-    }
-
-    return replyText;
-  } catch (error: unknown) {
-    console.error('Error contacting AI service:', error);
-    if (error instanceof Error && error.message) {
+    const message = error?.message || '';
+    if (message.includes('GEMINI_API_KEY') || message.includes('Input GEMINI_API_KEY')) {
       throw error;
     }
-    throw new Error('Terjadi masalah saat menghubungkan ke ARVIN AI.');
+
+    throw new Error(
+      'Koneksi AI Terputus. Server API tidak dapat dijangkau dan GEMINI_API_KEY belum diatur. Silakan klik tombol "Input GEMINI_API_KEY" untuk menghubungkan langsung.'
+    );
   }
+
+  throw new Error('Tidak ada respon dari ARVIN AI.');
 }
 
 /**
@@ -95,9 +171,7 @@ export async function analyzeContent(params: {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -128,9 +202,7 @@ export async function generateContentIdeas(
   try {
     const response = await fetch('/api/ideas', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -170,9 +242,7 @@ export async function regenerateSingleIdea(params: {
   try {
     const response = await fetch('/api/ideas/regenerate-single', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -207,9 +277,7 @@ export async function generateCaptions(
   try {
     const response = await fetch('/api/captions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -244,9 +312,7 @@ export async function generateHooks(
   try {
     const response = await fetch('/api/hooks', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -281,9 +347,7 @@ export async function generateScript(
   try {
     const response = await fetch('/api/scripts', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 
@@ -318,9 +382,7 @@ export async function generateHashtags(
   try {
     const response = await fetch('/api/hashtags', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(params),
     });
 

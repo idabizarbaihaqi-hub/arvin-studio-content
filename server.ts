@@ -174,8 +174,8 @@ function logAiHistory(
 }
 
 // Initialize Gemini SDK with User-Agent telemetry
-function getGeminiClient(): GoogleGenAI {
-  let apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+function getGeminiClient(customApiKey?: string): GoogleGenAI {
+  let apiKey = (customApiKey && customApiKey.trim()) || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (!apiKey) {
     try {
@@ -194,7 +194,7 @@ function getGeminiClient(): GoogleGenAI {
 
   if (!apiKey) {
     throw new Error(
-      "GEMINI_API_KEY belum dikonfigurasi. Silakan tambahkan GEMINI_API_KEY pada Environment Variables Vercel."
+      "GEMINI_API_KEY belum dikonfigurasi. Anda dapat memasukkan API Key melalui menu Input GEMINI_API_KEY di aplikasi atau menyimpannya di Environment Variables Vercel."
     );
   }
   return new GoogleGenAI({
@@ -205,6 +205,16 @@ function getGeminiClient(): GoogleGenAI {
       },
     },
   });
+}
+
+function getClientApiKey(req: Request): string | undefined {
+  const headerKey = req.headers["x-gemini-api-key"] as string;
+  if (headerKey && headerKey.trim()) return headerKey.trim();
+  const auth = req.headers.authorization;
+  if (auth && auth.toLowerCase().startsWith("bearer aiza")) {
+    return auth.substring(7).trim();
+  }
+  return undefined;
 }
 
 /**
@@ -477,7 +487,7 @@ app.post("/api/chat", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
 
     // Clean and normalize messages
     const validMessages: Array<{ role: "user" | "model"; text: string }> = [];
@@ -544,7 +554,7 @@ app.post("/api/analyze", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
 
     const prompt = `Lakukan analisis mendalam terhadap konten berikut:
 Platform Target: ${platform}
@@ -676,7 +686,7 @@ app.post("/api/ideas", async (req: Request, res: Response): Promise<void> => {
     }
 
     const safeCount = [5, 10, 15].includes(Number(count)) ? Number(count) : 5;
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
 
     let excludeClause = "";
     if (Array.isArray(excludeTitles) && excludeTitles.length > 0) {
@@ -822,7 +832,7 @@ app.post("/api/ideas/regenerate-single", async (req: Request, res: Response): Pr
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
 
     const prompt = `Buatkan 1 ide konten alternatif yang BARU, SEGAR, dan BERBEDA untuk menggantikan ide sebelumnya ("${currentTitle}").
 
@@ -921,7 +931,7 @@ app.post("/api/captions", async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
 
     // Specific instructions per platform
     let platformGuide = "";
@@ -1153,7 +1163,7 @@ app.post("/api/hooks", async (req: Request, res: Response): Promise<void> => {
     }
 
     const requestedCount = Math.min(Math.max(Number(count) || 10, 5), 20);
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
 
     // Platform-specific hook optimization guideline
     let platformGuide = "";
@@ -1365,7 +1375,7 @@ app.post("/api/scripts", async (req, res) => {
       });
     }
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
     const systemInstruction = `Kamu adalah Lead Scriptwriter & Video Director di ARVIN STUDIO.
 Tugasmu membuat naskah konten video/audio yang terstruktur, alami, tidak kaku seperti robot, dan siap dieksekusi oleh creator.
 
@@ -1561,7 +1571,7 @@ app.post("/api/hashtags", async (req, res) => {
       ? Number(count)
       : 15;
 
-    const ai = getGeminiClient();
+    const ai = getGeminiClient(getClientApiKey(req));
     const systemInstruction = `Kamu adalah Social Media Growth Strategist & Algorithm Specialist di ARVIN STUDIO.
 Tugasmu menghasilkan daftar hashtag yang sangat relevan, terarah, dan terbukti membantu konten menjangkau audiens yang tepat.
 

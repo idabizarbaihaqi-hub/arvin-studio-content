@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ActiveView } from '../types';
 import { logoutUser } from '../services/accessControlService';
+import { ApiKeyModal } from './ApiKeyModal';
 
 interface SettingsProps {
   onBack: () => void;
@@ -36,6 +37,7 @@ export const Settings: React.FC<SettingsProps> = ({
   userEmail,
 }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const handleConfirmLogout = async () => {
@@ -143,6 +145,29 @@ export const Settings: React.FC<SettingsProps> = ({
               <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                 Tinggi
               </span>
+            </button>
+
+            {/* Gemini API Key */}
+            <button
+              type="button"
+              onClick={() => setShowApiKeyModal(true)}
+              className="w-full p-4 flex items-center justify-between hover:bg-amber-50/40 transition-colors text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm text-slate-900">GEMINI_API_KEY</h3>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800">
+                      API
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">Input atau ubah kunci API Google Gemini pribadi</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
           </div>
         </div>
@@ -485,6 +510,12 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
         )}
+
+        {/* ApiKeyModal */}
+        <ApiKeyModal
+          isOpen={showApiKeyModal}
+          onClose={() => setShowApiKeyModal(false)}
+        />
       </div>
     </div>
   );

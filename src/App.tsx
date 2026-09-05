@@ -36,6 +36,7 @@ import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { AsLogo } from './components/AsLogo';
 import { FeaturePlaceholderModal } from './components/FeaturePlaceholderModal';
 import { OptionsMenuModal } from './components/OptionsMenuModal';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { SuperAdminGuard } from './components/admin/SuperAdminGuard';
 
@@ -54,6 +55,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [placeholderItem, setPlaceholderItem] = useState<MenuItem | null>(null);
 
   // Sync route with browser history (popstate)
@@ -213,10 +215,11 @@ export default function App() {
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err: unknown) {
       console.error('Failed to receive AI response:', err);
+      const errMsg = err instanceof Error ? err.message : 'Terjadi masalah saat menghubungkan ke ARVIN AI.';
       const errorChatMessage: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'model',
-        text: 'Terjadi masalah saat menghubungkan ke ARVIN AI.',
+        text: errMsg,
         timestamp: new Date(),
         isError: true,
       };
@@ -270,10 +273,11 @@ export default function App() {
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err: unknown) {
       console.error('Retry failed:', err);
+      const errMsg = err instanceof Error ? err.message : 'Terjadi masalah saat menghubungkan ke ARVIN AI.';
       const errorChatMessage: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'model',
-        text: 'Terjadi masalah saat menghubungkan ke ARVIN AI.',
+        text: errMsg,
         timestamp: new Date(),
         isError: true,
       };
@@ -375,6 +379,7 @@ export default function App() {
       <Header
         onOpenSidebar={() => setIsSidebarOpen(true)}
         onOpenMenu={() => setIsOptionsMenuOpen(true)}
+        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
         hasMessages={messages.length > 0}
         activeView={activeView}
       />
@@ -463,6 +468,7 @@ export default function App() {
                       message={msg}
                       onRetry={handleRetryLast}
                       isLast={index === messages.length - 1}
+                      onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
                     />
                   ))}
 
@@ -519,6 +525,13 @@ export default function App() {
         onNewChat={handleNewChat}
         messageCount={messages.length}
         onNavigate={setActiveView}
+        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+      />
+
+      {/* GEMINI_API_KEY Input Modal */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
       />
     </div>
   );
