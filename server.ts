@@ -47,7 +47,8 @@ app.use((req, _res, next) => {
     const apiRoutes = [
       "/chat", "/analyze", "/ideas", "/captions", "/hooks", "/scripts",
       "/hashtags", "/content-plans", "/ai-usage", "/history", "/analytics",
-      "/account", "/subscription", "/credits", "/usage-limit", "/auth", "/health", "/admin"
+      "/account", "/subscription", "/credits", "/usage-limit", "/auth", "/health", "/admin",
+      "/founder-profile"
     ];
     if (apiRoutes.some((r) => original.startsWith(r))) {
       req.url = "/api" + req.url;
@@ -652,6 +653,59 @@ async function generateAIContentWithFallback(
 // API routes
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", app: "ARVIN STUDIO", timestamp: new Date().toISOString() });
+});
+
+// Official Founder Profile Endpoints
+const DEFAULT_FOUNDER_DATA = {
+  name: "Arvin Erlangga",
+  title: "Founder & Owner",
+  photoUrl: "Screenshot_2026-09-14-20-06-59-55_680d03679600f7af0b4c700c6b270fe7.jpg",
+  bio: `Arvin Erlangga adalah founder dan visionary di balik ARVIN STUDIO, sebuah platform teknologi berbasis AI yang dibangun untuk menghadirkan pengalaman kreatif digital yang lebih cerdas, sederhana, dan terintegrasi.\n\nDengan ketertarikan pada teknologi, kreativitas, dan inovasi digital, Arvin membangun ARVIN STUDIO dengan satu visi: membuat teknologi AI yang powerful terasa lebih dekat dan mudah digunakan oleh siapa pun.\n\nARVIN STUDIO dikembangkan sebagai ruang kerja digital bagi para creator dan pengguna modern untuk menciptakan ide, mengembangkan konten, menganalisis performa, serta merencanakan strategi secara lebih efektif dalam satu ekosistem.\n\nBagi Arvin, teknologi bukan sekadar tentang kecanggihan, tetapi tentang bagaimana sebuah inovasi dapat memberikan nilai, kesempatan, dan dampak nyata bagi penggunanya.`,
+  quote: "Building technology that turns ideas into possibilities.",
+};
+
+let founderProfileCache = { ...DEFAULT_FOUNDER_DATA };
+
+app.get("/api/founder-profile", (_req: Request, res: Response): void => {
+  res.json({ success: true, data: founderProfileCache });
+});
+
+app.post("/api/founder-profile", (req: Request, res: Response): void => {
+  try {
+    const { profile, adminEmail, photoBase64 } = req.body || {};
+    if (profile && typeof profile === "object") {
+      let savedPhotoUrl = profile.photoUrl || founderProfileCache.photoUrl;
+
+      // If a base64 image was uploaded, write it to public directory
+      if (photoBase64 && typeof photoBase64 === "string") {
+        try {
+          const publicDir = path.join(process.cwd(), "public");
+          if (!fs.existsSync(publicDir)) {
+            fs.mkdirSync(publicDir, { recursive: true });
+          }
+          const base64Data = photoBase64.replace(/^data:image\/\w+;base64,/, "");
+          const targetFile = path.join(publicDir, "founder_photo.jpg");
+          fs.writeFileSync(targetFile, Buffer.from(base64Data, "base64"));
+          savedPhotoUrl = "/founder_photo.jpg";
+        } catch (writeErr) {
+          console.warn("[Server] Failed to write founder photo file to public dir:", writeErr);
+        }
+      }
+
+      founderProfileCache = {
+        ...founderProfileCache,
+        ...profile,
+        photoUrl: savedPhotoUrl,
+        updatedAt: new Date().toISOString(),
+        updatedBy: adminEmail || "super_admin",
+      };
+      res.json({ success: true, data: founderProfileCache });
+      return;
+    }
+    res.status(400).json({ error: "Invalid profile payload" });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
 });
 
 // Admin endpoints for Gemini API Key configuration

@@ -303,9 +303,10 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs divide-y divide-slate-100 overflow-hidden">
             {/* About ARVIN STUDIO */}
             <button
+              id="btn-settings-about"
               type="button"
-              onClick={() => setActiveModal('About ARVIN STUDIO')}
-              className="w-full p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left"
+              onClick={() => onNavigate('about')}
+              className="w-full p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
@@ -313,7 +314,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-slate-900">About ARVIN STUDIO</h3>
-                  <p className="text-xs text-slate-500">Versi 1.0 • Platform AI Creator Workspace</p>
+                  <p className="text-xs text-slate-500">Versi 1.0.0 • Platform AI Creator Workspace & Founder Profile</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400" />

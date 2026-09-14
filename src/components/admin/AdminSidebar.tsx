@@ -14,6 +14,7 @@ import {
   X,
   Sparkles,
   Landmark,
+  Award,
 } from 'lucide-react';
 import { AdminViewKey, UserProfile } from '../../types';
 import { AsLogo } from '../AsLogo';
@@ -70,6 +71,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     {
       group: 'SYSTEM',
       items: [
+        { key: 'founder-profile' as AdminViewKey, label: 'Founder Profile', icon: Award },
         { key: 'system-settings' as AdminViewKey, label: 'System Settings', icon: Settings },
         { key: 'admin-profile' as AdminViewKey, label: 'Admin Profile', icon: ShieldCheck },
       ],

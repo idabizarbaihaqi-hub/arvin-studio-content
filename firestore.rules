@@ -139,6 +139,19 @@ service cloud.firestore {
       );
     }
 
+    // Match app_settings collection (Official app configurations & Founder Profile)
+    match /app_settings/{settingId} {
+      // Standard users & visitors have read-only access to official app information and founder profile
+      allow read: if true;
+      // ONLY Super Admins can create, update, or delete app settings and founder profile data
+      allow write: if isSuperAdmin() || (
+        isAuthenticated() && request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
+        )
+      );
+    }
+
     // Deny all other paths
     match /{document=**} {
       allow read, write: if false;

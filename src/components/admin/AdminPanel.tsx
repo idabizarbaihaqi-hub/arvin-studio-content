@@ -22,6 +22,7 @@ import { AdminActivityLogs } from './AdminActivityLogs';
 import { AdminProfile } from './AdminProfile';
 import { SystemSettings } from './SystemSettings';
 import { PaymentAccountManagement } from './PaymentAccountManagement';
+import { FounderManagement } from './FounderManagement';
 
 interface AdminPanelProps {
   currentUser: UserProfile | null;
@@ -204,6 +205,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {currentView === 'activity-logs' && (
             <AdminActivityLogs />
+          )}
+
+          {currentView === 'founder-profile' && (
+            <FounderManagement currentUser={currentUser} />
           )}
 
           {currentView === 'admin-profile' && (

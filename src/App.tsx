@@ -35,6 +35,7 @@ import { Profile } from './components/Profile';
 import { Premium } from './components/Premium';
 import { Credits } from './components/Credits';
 import { Settings } from './components/Settings';
+import { AboutArvinStudio } from './components/AboutArvinStudio';
 import { LoginView } from './components/LoginView';
 import { RegisterView } from './components/RegisterView';
 import { ForgotPasswordView } from './components/ForgotPasswordView';
@@ -466,6 +467,13 @@ export default function App() {
           onNavigate={setActiveView}
           onLogout={handleLogout}
           userEmail={currentUser?.email}
+        />
+      ) : activeView === 'about' ? (
+        <AboutArvinStudio
+          onBack={() => setActiveView('settings')}
+          userEmail={currentUser?.email}
+          currentUser={currentUser}
+          onNavigate={setActiveView}
         />
       ) : activeView === 'content-analyzer' ? (
         <ContentAnalyzer

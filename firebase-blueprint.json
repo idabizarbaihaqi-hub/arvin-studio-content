@@ -179,6 +179,21 @@
         "adminId": { "type": "string", "description": "UID super admin pengubah" }
       },
       "required": ["apiKey", "updatedAt", "updatedBy"]
+    },
+    "FounderProfile": {
+      "title": "FounderProfile",
+      "description": "Profil resmi Founder & Owner ARVIN STUDIO di collection app_settings dokumen founder_profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Nama resmi Founder & Owner" },
+        "title": { "type": "string", "description": "Jabatan resmi, e.g. Founder & Owner" },
+        "photoUrl": { "type": "string", "description": "URL foto resmi Founder & Owner" },
+        "bio": { "type": "string", "description": "Biografi lengkap Founder & Owner" },
+        "quote": { "type": "string", "description": "Kutipan / visi resmi Founder" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" },
+        "updatedBy": { "type": "string", "description": "Email atau UID super admin pengubah" }
+      },
+      "required": ["name", "title", "bio", "quote"]
     }
   },
   "firestore": {
@@ -221,6 +236,10 @@
     "/system_settings/{settingId}": {
       "schema": { "$ref": "#/entities/SystemSetting" },
       "description": "Konfigurasi terpusat Super Admin di Firestore termasuk Kunci API Gemini Global"
+    },
+    "/app_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/FounderProfile" },
+      "description": "Pengaturan resmi aplikasi termasuk data publik Founder & Owner ARVIN STUDIO"
     }
   }
 }

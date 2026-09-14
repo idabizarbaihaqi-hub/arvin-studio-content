@@ -176,6 +176,7 @@ export type ActiveView =
   | 'premium'
   | 'credits'
   | 'settings'
+  | 'about'
   | 'login'
   | 'register'
   | 'forgot-password';
@@ -717,8 +718,19 @@ export type AdminViewKey =
   | 'ai-usage'
   | 'content-history'
   | 'activity-logs'
+  | 'founder-profile'
   | 'system-settings'
   | 'admin-profile';
+
+export interface FounderProfile {
+  name: string;
+  title: string;
+  photoUrl: string;
+  bio: string;
+  quote: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
 
 export interface AdminActivityLog {
   id: string;
