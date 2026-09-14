@@ -1,11 +1,36 @@
 export type MessageRole = 'user' | 'model';
 
+export interface ChatImageAttachment {
+  dataUrl?: string;
+  data?: string;
+  base64?: string;
+  mimeType: string;
+  fileName?: string;
+  name?: string;
+  fileSize?: number;
+  sizeBytes?: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
   text: string;
   timestamp: Date;
   isError?: boolean;
+  image?: ChatImageAttachment;
+  imageAttachment?: ChatImageAttachment;
+}
+
+export interface AiDailyUsageRecord {
+  id: string; // `${userId}_${date}`
+  userId: string;
+  date: string; // YYYY-MM-DD
+  totalUsage: number;
+  limit: number;
+  featureBreakdown?: Record<string, number>;
+  lastUsedFeature?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type SidebarMenuItemId =
@@ -547,7 +572,7 @@ export interface UserProfile {
   role: 'USER' | 'ADMIN' | 'SUPER_ADMIN';
   adminAccess?: boolean;
   plan: 'FREE' | 'PREMIUM';
-  subscriptionStatus: 'INACTIVE' | 'ACTIVE';
+  subscriptionStatus: 'INACTIVE' | 'ACTIVE' | 'PENDING';
   subscriptionExpiry?: string | null;
   // Backwards compatibility
   displayName?: string;

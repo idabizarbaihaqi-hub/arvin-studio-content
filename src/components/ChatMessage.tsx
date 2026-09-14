@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Markdown from 'react-markdown';
-import { Copy, Check, RefreshCw, AlertCircle } from 'lucide-react';
+import { Copy, Check, RefreshCw, AlertCircle, Maximize2, X } from 'lucide-react';
 import { ChatMessage as ChatMessageType } from '../types';
 import { AsLogo } from './AsLogo';
 
@@ -17,6 +17,7 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
   isLast,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showImageLightbox, setShowImageLightbox] = useState(false);
   const isUser = message.role === 'user';
 
   const handleCopy = async () => {
@@ -36,19 +37,70 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
 
   if (isUser) {
     return (
-      <div
-        id={`message-user-${message.id}`}
-        className="flex justify-end mb-4 sm:mb-5 px-3 sm:px-4"
-      >
-        <div className="max-w-[85%] sm:max-w-[78%] flex flex-col items-end">
-          <div className="bg-slate-900 text-white px-4 py-3 rounded-2xl rounded-br-xs shadow-md shadow-slate-900/10 text-sm sm:text-[15px] leading-relaxed break-words whitespace-pre-wrap">
-            {message.text}
+      <>
+        <div
+          id={`message-user-${message.id}`}
+          className="flex justify-end mb-4 sm:mb-5 px-3 sm:px-4"
+        >
+          <div className="max-w-[85%] sm:max-w-[78%] flex flex-col items-end">
+            {message.image?.data && (
+              <div className="mb-2 relative group overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs bg-slate-100 max-w-[280px] sm:max-w-[340px]">
+                <img
+                  src={message.image.data}
+                  alt={message.image.name || 'Screenshot analisis'}
+                  className="w-full max-h-60 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={() => setShowImageLightbox(true)}
+                />
+                <div
+                  onClick={() => setShowImageLightbox(true)}
+                  className="absolute bottom-2 right-2 bg-slate-950/70 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1 text-[11px]"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Perbesar</span>
+                </div>
+              </div>
+            )}
+            <div className="bg-slate-900 text-white px-4 py-3 rounded-2xl rounded-br-xs shadow-md shadow-slate-900/10 text-sm sm:text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+              {message.text}
+            </div>
+            <span className="text-[11px] text-slate-400 mt-1 px-1">
+              {formattedTime}
+            </span>
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 px-1">
-            {formattedTime}
-          </span>
         </div>
-      </div>
+
+        {/* Lightbox Preview Modal */}
+        {showImageLightbox && message.image?.data && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setShowImageLightbox(false)}
+          >
+            <div
+              className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl p-2 shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setShowImageLightbox(false)}
+                className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-slate-900 transition-colors cursor-pointer"
+                aria-label="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={message.image.data}
+                alt={message.image.name || 'Screenshot'}
+                className="max-h-[82vh] max-w-full rounded-xl object-contain"
+              />
+              {message.image.name && (
+                <div className="p-2 text-center text-xs font-medium text-slate-500">
+                  {message.image.name}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 

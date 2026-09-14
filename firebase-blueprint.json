@@ -51,6 +51,23 @@
       },
       "required": ["id", "userId", "feature", "date", "usageCount", "createdAt", "updatedAt"]
     },
+    "AiDailyUsage": {
+      "title": "AiDailyUsage",
+      "description": "Pencatatan kuota global 5x total pemakaian seluruh fitur AI per hari di collection ai_daily_usage",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID gabungan userId_date" },
+        "userId": { "type": "string", "description": "UID pengguna" },
+        "date": { "type": "string", "description": "Tanggal format YYYY-MM-DD" },
+        "totalUsage": { "type": "number", "description": "Total seluruh pemakaian fitur AI pada hari tersebut" },
+        "limit": { "type": "number", "description": "Batas kuota harian (5 untuk Free)" },
+        "featureBreakdown": { "type": "object", "description": "Rincian pemakaian per fitur" },
+        "lastUsedFeature": { "type": "string", "description": "Fitur AI terakhir yang dipakai" },
+        "createdAt": { "type": "string", "description": "Waktu dibuat ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu diperbarui ISO" }
+      },
+      "required": ["id", "userId", "date", "totalUsage", "createdAt", "updatedAt"]
+    },
     "Subscription": {
       "title": "Subscription",
       "description": "Pengajuan dan riwayat langganan pengguna di collection subscriptions",
@@ -176,6 +193,10 @@
     "/ai_usage/{usageId}": {
       "schema": { "$ref": "#/entities/AiUsage" },
       "description": "Pencatatan pemakaian harian fitur AI per user dan tanggal"
+    },
+    "/ai_daily_usage/{usageId}": {
+      "schema": { "$ref": "#/entities/AiDailyUsage" },
+      "description": "Pencatatan global 5x total pemakaian seluruh fitur AI per hari di Firestore"
     },
     "/subscriptions/{subId}": {
       "schema": { "$ref": "#/entities/Subscription" },

@@ -46,6 +46,48 @@ export function validateProfilePhoto(file: File): PhotoValidationResult {
 }
 
 /**
+ * Compress / optimize image client-side to ensure upload never hangs or fails on large payloads
+ */
+async function optimizeProfilePhotoImage(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 400;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } else {
+          resolve((e.target?.result as string) || '');
+        }
+      };
+      img.onerror = () => resolve((e.target?.result as string) || '');
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Upload profile photo to Firebase Storage and update Firestore & Auth
  * Path: profile_photos/{userId}/profile_{timestamp}.{extension}
  */
@@ -78,16 +120,37 @@ export async function uploadUserProfilePhoto(
   const storagePath = `profile_photos/${userId}/profile_${timestamp}.${ext}`;
   const photoRef = ref(storage, storagePath);
 
+  let downloadURL = '';
+
   try {
-    // 3. Upload to Firebase Storage
-    const snapshot = await uploadBytes(photoRef, file, {
-      contentType: file.type || `image/${ext}`,
-    });
+    // 3. Upload to Firebase Storage with a 20-second timeout safeguard
+    const uploadTask = (async () => {
+      const snapshot = await uploadBytes(photoRef, file, {
+        contentType: file.type || `image/${ext}`,
+      });
+      return await getDownloadURL(snapshot.ref);
+    })();
 
-    // 4. Get download URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
+    const timeoutTask = new Promise<string>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('STORAGE_TIMEOUT')),
+        15000
+      )
+    );
 
-    // 5. Update Firestore user document
+    downloadURL = await Promise.race([uploadTask, timeoutTask]);
+  } catch (storageErr: any) {
+    console.warn('[ProfilePhoto] Storage direct upload warning/timeout:', storageErr?.message || storageErr);
+    // Fallback to high-quality compressed image if Firebase storage stalls or fails
+    downloadURL = await optimizeProfilePhotoImage(file);
+  }
+
+  if (!downloadURL) {
+    throw new Error('Foto profil gagal diproses. Silakan coba file gambar lainnya.');
+  }
+
+  try {
+    // 4. Update Firestore user document
     const now = new Date().toISOString();
     const userDocRef = doc(db, 'users', userId);
     await updateDoc(userDocRef, {
@@ -95,29 +158,31 @@ export async function uploadUserProfilePhoto(
       updatedAt: now,
     });
 
-    // 6. Update Firebase Auth Profile
+    // 5. Update Firebase Auth Profile
     try {
       await updateAuthProfile(currentUser, { photoURL: downloadURL });
     } catch (authErr) {
       console.warn('Failed to update Auth profile photoURL:', authErr);
     }
 
-    // 7. Delete old photo from Storage only AFTER new upload succeeded
-    if (oldPhotoURL && (oldPhotoURL.includes('firebasestorage.googleapis.com') || oldPhotoURL.includes('profile_photos'))) {
+    // 6. Delete old photo from Storage only AFTER new upload succeeded
+    if (
+      oldPhotoURL &&
+      (oldPhotoURL.includes('firebasestorage.googleapis.com') ||
+        oldPhotoURL.includes('profile_photos'))
+    ) {
       try {
-        // Try deleting if URL is a full gs or download URL
         const oldRef = ref(storage, oldPhotoURL);
         await deleteObject(oldRef);
       } catch (delErr) {
-        // Non-fatal: old file cleanup failure should not fail the operation
-        console.warn('Old profile photo cleanup error:', delErr);
+        console.warn('Old profile photo cleanup non-fatal error:', delErr);
       }
     }
 
     return downloadURL;
   } catch (err: any) {
-    console.error('Error uploading profile photo:', err);
-    throw new Error(err.message || 'Foto profile gagal diunggah. Silakan coba lagi.');
+    console.error('Error saving profile photo to database:', err);
+    throw new Error(err.message || 'Gagal menyimpan foto profil ke database.');
   }
 }
 

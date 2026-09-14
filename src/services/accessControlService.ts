@@ -709,7 +709,7 @@ export async function uploadPaymentProof(
 }
 
 // ----------------------------------------------------
-// DAILY USAGE LIMIT (5x PER DAY PER TOOL SEPARATELY)
+// DAILY USAGE LIMIT (GLOBAL 5x PER DAY ACROSS ALL AI TOOLS)
 // ----------------------------------------------------
 
 export function getTodayDateString(): string {
@@ -748,22 +748,33 @@ export async function canUseFeature(feature: AiFeatureKey): Promise<UsageLimitCh
     };
   }
 
-  // 2. User is FREE -> check usage for this specific tool for today
+  // 2. User is FREE -> check GLOBAL daily usage across all AI features for today
   const dateStr = getTodayDateString();
-  const usageDocId = `${uid}_${feature}_${dateStr}`;
-  const usageDocRef = doc(db, 'ai_usage', usageDocId);
+  const globalDocId = `${uid}_${dateStr}`;
+  const globalDocRef = doc(db, 'ai_daily_usage', globalDocId);
 
   try {
-    const snap = await getDoc(usageDocRef);
-    const count = snap.exists() ? Number(snap.data()?.usageCount || 0) : 0;
-    const limit = 5;
-    const remaining = Math.max(0, limit - count);
+    const snap = await getDoc(globalDocRef);
+    let totalCount = 0;
+    if (snap.exists()) {
+      totalCount = Number(snap.data()?.totalUsage || 0);
+    } else {
+      // Fallback check to legacy ai_usage if daily document not yet seeded today
+      const legacyDocRef = doc(db, 'ai_usage', `${uid}_${feature}_${dateStr}`);
+      const legacySnap = await getDoc(legacyDocRef);
+      if (legacySnap.exists()) {
+        totalCount = Number(legacySnap.data()?.usageCount || 0);
+      }
+    }
 
-    if (count >= limit) {
+    const limit = 5;
+    const remaining = Math.max(0, limit - totalCount);
+
+    if (totalCount >= limit) {
       return {
         allowed: false,
         feature,
-        count,
+        count: totalCount,
         limit,
         remaining: 0,
         isPremium: false,
@@ -774,14 +785,14 @@ export async function canUseFeature(feature: AiFeatureKey): Promise<UsageLimitCh
     return {
       allowed: true,
       feature,
-      count,
+      count: totalCount,
       limit,
       remaining,
       isPremium: false,
       reason: 'ALLOWED',
     };
   } catch (err) {
-    console.error('Error checking usage limit in Firestore:', err);
+    console.error('Error checking global usage limit in Firestore:', err);
     return {
       allowed: true,
       feature,
@@ -792,6 +803,45 @@ export async function canUseFeature(feature: AiFeatureKey): Promise<UsageLimitCh
       reason: 'ALLOWED',
     };
   }
+}
+
+export async function getGlobalDailyUsage(): Promise<{
+  totalUsage: number;
+  limit: number;
+  remaining: number;
+  isPremium: boolean;
+  featureBreakdown: Record<string, number>;
+}> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    return { totalUsage: 0, limit: 5, remaining: 5, isPremium: false, featureBreakdown: {} };
+  }
+
+  const premiumActive = await isPremium();
+  if (premiumActive) {
+    return { totalUsage: 0, limit: 999, remaining: 999, isPremium: true, featureBreakdown: {} };
+  }
+
+  const dateStr = getTodayDateString();
+  const globalDocId = `${uid}_${dateStr}`;
+  try {
+    const snap = await getDoc(doc(db, 'ai_daily_usage', globalDocId));
+    if (snap.exists()) {
+      const data = snap.data();
+      const totalUsage = Number(data.totalUsage || 0);
+      return {
+        totalUsage,
+        limit: 5,
+        remaining: Math.max(0, 5 - totalUsage),
+        isPremium: false,
+        featureBreakdown: data.featureBreakdown || {},
+      };
+    }
+  } catch (err) {
+    console.error('Error getting global daily usage:', err);
+  }
+
+  return { totalUsage: 0, limit: 5, remaining: 5, isPremium: false, featureBreakdown: {} };
 }
 
 export async function getRemainingDailyUsage(
@@ -806,7 +856,8 @@ export async function getRemainingDailyUsage(
 }
 
 /**
- * Increments usageCount only after AI generation successfully finishes.
+ * Increments global AI usage count (ai_daily_usage) and per-feature record (ai_usage)
+ * only after AI generation successfully finishes.
  */
 export async function consumeFeatureUsage(
   feature: AiFeatureKey
@@ -820,33 +871,67 @@ export async function consumeFeatureUsage(
   }
 
   const dateStr = getTodayDateString();
-  const usageDocId = `${uid}_${feature}_${dateStr}`;
-  const usageDocRef = doc(db, 'ai_usage', usageDocId);
   const now = new Date().toISOString();
 
+  // 1. Update Global 5x limit in ai_daily_usage/{userId}_{date}
+  const globalDocId = `${uid}_${dateStr}`;
+  const globalDocRef = doc(db, 'ai_daily_usage', globalDocId);
+
+  // 2. Also keep per-feature count in ai_usage/{userId}_{feature}_{date} for analytics
+  const featureDocId = `${uid}_${feature}_${dateStr}`;
+  const featureDocRef = doc(db, 'ai_usage', featureDocId);
+
   try {
-    const snap = await getDoc(usageDocRef);
-    const currentCount = snap.exists() ? Number(snap.data()?.usageCount || 0) : 0;
-    const newCount = currentCount + 1;
+    const globalSnap = await getDoc(globalDocRef);
+    const currentTotal = globalSnap.exists() ? Number(globalSnap.data()?.totalUsage || 0) : 0;
+    const newTotal = currentTotal + 1;
+    const currentBreakdown = globalSnap.exists() ? (globalSnap.data()?.featureBreakdown || {}) : {};
+    const updatedBreakdown = {
+      ...currentBreakdown,
+      [feature]: (Number(currentBreakdown[feature]) || 0) + 1,
+    };
 
     await setDoc(
-      usageDocRef,
+      globalDocRef,
       {
-        id: usageDocId,
+        id: globalDocId,
         userId: uid,
-        feature,
         date: dateStr,
-        usageCount: newCount,
-        createdAt: (snap.exists() && snap.data()?.createdAt) ? snap.data()?.createdAt : now,
+        totalUsage: newTotal,
+        limit: 5,
+        featureBreakdown: updatedBreakdown,
+        lastUsedFeature: feature,
+        createdAt: (globalSnap.exists() && globalSnap.data()?.createdAt) ? globalSnap.data()?.createdAt : now,
         updatedAt: now,
       },
       { merge: true }
     );
 
-    const remaining = Math.max(0, 5 - newCount);
+    // Update per-feature doc
+    try {
+      const featSnap = await getDoc(featureDocRef);
+      const featCount = featSnap.exists() ? Number(featSnap.data()?.usageCount || 0) : 0;
+      await setDoc(
+        featureDocRef,
+        {
+          id: featureDocId,
+          userId: uid,
+          feature,
+          date: dateStr,
+          usageCount: featCount + 1,
+          createdAt: (featSnap.exists() && featSnap.data()?.createdAt) ? featSnap.data()?.createdAt : now,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    } catch (featErr) {
+      console.warn('Non-fatal: could not update per-feature ai_usage record:', featErr);
+    }
+
+    const remaining = Math.max(0, 5 - newTotal);
     return { success: true, remaining };
   } catch (err) {
-    console.error('Error incrementing usage count:', err);
+    console.error('Error incrementing global usage count:', err);
     return { success: false, remaining: 0 };
   }
 }
@@ -928,28 +1013,39 @@ export async function getAccountSummary(): Promise<AccountSummary> {
   const dateStr = getTodayDateString();
   const dailyUsageMap: Record<AiFeatureKey, FeatureUsageStatus> = {} as any;
 
+  // Read global daily usage for Free user
+  let globalTotal = 0;
+  try {
+    const globalSnap = await getDoc(doc(db, 'ai_daily_usage', `${uid}_${dateStr}`));
+    if (globalSnap.exists()) {
+      globalTotal = Number(globalSnap.data()?.totalUsage || 0);
+    }
+  } catch {
+    globalTotal = 0;
+  }
+
   for (const feat of allFeatures) {
     const usageDocId = `${uid}_${feat}_${dateStr}`;
-    let count = 0;
+    let featCount = 0;
     try {
       const snap = await getDoc(doc(db, 'ai_usage', usageDocId));
       if (snap.exists()) {
-        count = Number(snap.data()?.usageCount || 0);
+        featCount = Number(snap.data()?.usageCount || 0);
       }
     } catch {
-      count = 0;
+      featCount = 0;
     }
 
     const limit = premium ? 999 : 5;
-    const remaining = premium ? 999 : Math.max(0, 5 - count);
+    const remaining = premium ? 999 : Math.max(0, 5 - globalTotal);
 
     dailyUsageMap[feat] = {
       feature: feat,
       featureLabel: AI_FEATURE_LABELS[feat] || feat,
-      count,
+      count: premium ? featCount : globalTotal,
       limit,
       remaining,
-      isExceeded: !premium && count >= 5,
+      isExceeded: !premium && globalTotal >= 5,
     };
   }
 

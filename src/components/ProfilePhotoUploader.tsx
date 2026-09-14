@@ -92,24 +92,26 @@ export const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    let success = false;
     try {
       const downloadURL = await uploadUserProfilePhoto(selectedFile, currentPhotoURL);
+      success = true;
       setUploadState('success');
-      setSuccessMessage('Foto profile berhasil diperbarui.');
+      setSuccessMessage('Foto profil berhasil diperbarui.');
       onPhotoUpdated(downloadURL);
       handleCancelPreview();
 
       setTimeout(() => {
         setSuccessMessage(null);
         setUploadState('idle');
-      }, 4000);
+      }, 3500);
     } catch (err: any) {
+      console.error('[ProfilePhotoUploader] Error:', err);
       setUploadState('error');
-      setErrorMessage(err.message || 'Foto profile gagal diunggah. Silakan coba lagi.');
+      setErrorMessage(err?.message || 'Foto profil gagal diunggah. Silakan coba lagi.');
     } finally {
-      // Guaranteed to reset uploading state
-      if (uploadState === 'uploading') {
-        setUploadState('idle');
+      if (!success) {
+        setUploadState((prev) => (prev === 'uploading' ? 'error' : prev));
       }
     }
   };

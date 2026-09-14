@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { ChatMessage, MenuItem, ActiveView, UserProfile } from './types';
+import { ChatMessage, MenuItem, ActiveView, UserProfile, ChatImageAttachment } from './types';
 import { sendChatMessage } from './services/aiService';
 import {
   getUserProfile,
@@ -168,6 +168,7 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [attachedImage, setAttachedImage] = useState<ChatImageAttachment | null>(null);
 
   // Auto-scroll to bottom of conversation
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -186,18 +187,24 @@ export default function App() {
     }
   }, [messages, isLoading, activeView]);
 
-  // Send user message to Gemini
-  const handleSendMessage = async (customText?: string) => {
-    const textToSend = (customText ?? inputText).trim();
-    if (!textToSend || isLoading) return;
+  // Send user message to Gemini (with optional image attachment)
+  const handleSendMessage = async (customText?: string, customImage?: ChatImageAttachment) => {
+    const imgToSend = customImage ?? attachedImage;
+    let textToSend = (customText ?? inputText).trim();
 
-    // Check daily usage quota for FREE accounts (5x/day)
+    if ((!textToSend && !imgToSend) || isLoading) return;
+
+    if (!textToSend && imgToSend) {
+      textToSend = 'Tolong analisis gambar atau screenshot ini secara detail, berikan evaluasi insight, dan rekomendasi pembuatan konten atau copy/caption yang relevan.';
+    }
+
+    // Check daily usage quota for FREE accounts (5x/day global limit)
     const quotaCheck = await canUseFeature('chat');
     if (!quotaCheck.allowed) {
       const quotaErrorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'model',
-        text: 'Limit harian Chat AI untuk akun FREE sudah habis. Coba lagi besok atau upgrade ke Premium.',
+        text: 'Limit harian AI untuk akun FREE sudah mencapai batas maksimal (5× per hari). Coba lagi besok atau upgrade ke Premium.',
         timestamp: new Date(),
         isError: true,
       };
@@ -210,6 +217,7 @@ export default function App() {
       id: userMessageId,
       role: 'user',
       text: textToSend,
+      image: imgToSend || undefined,
       timestamp: new Date(),
     };
 
@@ -217,18 +225,20 @@ export default function App() {
     if (!customText) {
       setInputText('');
     }
+    setAttachedImage(null);
 
     const nextMessages = [...messages.filter((m) => !m.isError), userMessage];
     setMessages(nextMessages);
     setIsLoading(true);
 
     try {
-      // Send conversational history to server-side Gemini service
+      // Send conversational history to server-side Gemini service with multimodal image support
       const historyPayload = nextMessages
         .filter((m) => !m.isError)
         .map((m) => ({
           role: m.role,
           text: m.text,
+          image: m.image,
         }));
 
       const replyText = await sendChatMessage(historyPayload);
@@ -241,8 +251,8 @@ export default function App() {
         await recordAiUsage('Chat AI');
         await saveAiHistory({
           feature: 'Chat AI',
-          title: textToSend.slice(0, 50),
-          inputSummary: textToSend,
+          title: imgToSend ? `[Gambar] ${textToSend.slice(0, 40)}` : textToSend.slice(0, 50),
+          inputSummary: imgToSend ? `[Gambar: ${imgToSend.name || 'Screenshot'}] ${textToSend}` : textToSend,
           result: replyText,
         });
       } catch (saveErr) {
@@ -302,6 +312,7 @@ export default function App() {
       const historyPayload = cleanMessages.map((m) => ({
         role: m.role,
         text: m.text,
+        image: m.image,
       }));
 
       const replyText = await sendChatMessage(historyPayload);
@@ -505,7 +516,14 @@ export default function App() {
           >
             <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col py-3 sm:py-4">
               {messages.length === 0 ? (
-                <EmptyState />
+                <EmptyState
+                  onSelectImage={(attachment) => {
+                    setAttachedImage(attachment);
+                  }}
+                  onSelectPrompt={(promptText) => {
+                    handleSendMessage(promptText);
+                  }}
+                />
               ) : (
                 <div id="messages-list" className="flex-1 flex flex-col w-full">
                   {messages.map((msg, index) => (
@@ -531,7 +549,9 @@ export default function App() {
               onChange={setInputText}
               onSend={() => handleSendMessage()}
               isLoading={isLoading}
-              placeholder="Tulis pesan atau pertanyaan kontenmu..."
+              placeholder="Tulis pesan atau unggah gambar/screenshot..."
+              attachedImage={attachedImage}
+              onAttachImage={setAttachedImage}
             />
           </footer>
         </>

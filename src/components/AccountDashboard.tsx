@@ -302,23 +302,30 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
           </div>
         </div>
 
-        {/* Free Daily Limit Progress (All 7 AI Features) */}
+        {/* Free Daily Limit Progress (Global 5x Across All AI Features) */}
         <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
-              <h2 className="font-bold text-base text-slate-900">
-                Pemakaian Kuota Harian (Free Limit)
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-base text-slate-900">
+                  Kuota Harian AI
+                </h2>
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
+                  {isPremium ? 'PREMIUM' : 'GLOBAL LIMIT'}
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Pengguna FREE memiliki 5 penggunaan per hari untuk masing-masing fitur AI.
+                {isPremium
+                  ? 'Akun Premium memiliki akses tanpa batas (unlimited) ke seluruh alat AI.'
+                  : 'Pengguna Free memiliki batas 5× total pemakaian seluruh fitur AI per hari.'}
               </p>
             </div>
             {isPremium ? (
-              <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
-                Tanpa Batas Kuota
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shrink-0 self-start sm:self-auto">
+                Unlimited
               </span>
             ) : (
-              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold">
+              <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold shrink-0 self-start sm:self-auto">
                 Reset: 00:00 WIB
               </span>
             )}
@@ -351,7 +358,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                           isExceeded
                             ? 'bg-rose-100 text-rose-700'
                             : count > 0
-                            ? 'bg-amber-100 text-amber-800'
+                            ? 'bg-slate-200 text-slate-800'
                             : 'bg-slate-200/70 text-slate-600'
                         }`}
                       >
@@ -367,7 +374,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                               ? 'bg-rose-500'
                               : percent > 60
                               ? 'bg-amber-500'
-                              : 'bg-emerald-500'
+                              : 'bg-slate-900'
                           }`}
                           style={{ width: `${percent}%` }}
                         />
@@ -375,7 +382,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                     )}
 
                     <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500">
-                      <span>{isExceeded ? 'Kuota habis hari ini' : 'Sisa kuota'}</span>
+                      <span>{isExceeded ? 'Kuota global habis' : 'Sisa kuota global'}</span>
                       <span className="font-semibold text-slate-700">
                         {remaining} {typeof remaining === 'number' ? 'x lagi' : ''}
                       </span>

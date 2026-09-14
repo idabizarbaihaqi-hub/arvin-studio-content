@@ -4,6 +4,7 @@ import { db } from './firebase';
 import { getStoredApiKey } from './apiKeyService';
 import {
   ChatMessage,
+  ChatImageAttachment,
   ContentAnalysisResult,
   PlatformType,
   ContentCategoryType,
@@ -211,15 +212,38 @@ async function directClientGenerate(
 
 async function directClientGeminiChat(
   apiKey: string,
-  messages: Array<Pick<ChatMessage, 'role' | 'text'>>
+  messages: Array<Pick<ChatMessage, 'role' | 'text'> & { image?: ChatImageAttachment }>
 ): Promise<string> {
   const ai = new GoogleGenAI({ apiKey });
   const validMessages = messages
-    .filter((m) => m && (m.text || '').trim().length > 0)
-    .map((m) => ({
-      role: m.role === 'model' ? ('model' as const) : ('user' as const),
-      parts: [{ text: m.text }],
-    }));
+    .filter((m) => m && ((m.text || '').trim().length > 0 || m.image?.data))
+    .map((m) => {
+      const parts: any[] = [];
+      if (m.image && m.image.data) {
+        let base64 = m.image.data;
+        if (base64.includes('base64,')) {
+          base64 = base64.split('base64,')[1];
+        }
+        parts.push({
+          inlineData: {
+            mimeType: m.image.mimeType || 'image/jpeg',
+            data: base64,
+          },
+        });
+      }
+      let text = (m.text || '').trim();
+      if (!text && parts.length > 0) {
+        text = 'Analisis gambar atau tangkapan layar ini secara detail, berikan evaluasi, insight, serta saran pembuatan konten atau copy/caption yang relevan.';
+      }
+      if (text) {
+        parts.push({ text });
+      }
+
+      return {
+        role: m.role === 'model' ? ('model' as const) : ('user' as const),
+        parts,
+      };
+    });
 
   while (validMessages.length > 0 && validMessages[0].role !== 'user') {
     validMessages.shift();
@@ -733,7 +757,7 @@ Respons HARUS HANYA berupa JSON valid tanpa markdown.`;
  * Send chat message using ARVIN AI (Gemini)
  */
 export async function sendChatMessage(
-  messages: Array<Pick<ChatMessage, 'role' | 'text'>>
+  messages: Array<Pick<ChatMessage, 'role' | 'text'> & { image?: ChatImageAttachment }>
 ): Promise<string> {
   const headers = await getAuthHeaders();
 
@@ -741,6 +765,13 @@ export async function sendChatMessage(
     role: m.role,
     text: m.text,
     content: m.text,
+    image: m.image
+      ? {
+          data: m.image.data,
+          mimeType: m.image.mimeType,
+          name: m.image.name,
+        }
+      : undefined,
   }));
 
   try {
@@ -778,7 +809,7 @@ export async function sendChatMessage(
     throw new Error('Koneksi AI Terputus. Periksa API Key Gemini Anda di System Settings atau coba beberapa saat lagi.');
   }
 
-  throw new Error('Tidak ada respon dari ARVIN AI.');
+  throw new Error('Gagal mendapatkan balasan dari ARVIN AI.');
 }
 
 /**

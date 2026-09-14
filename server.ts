@@ -808,6 +808,11 @@ interface ChatMessagePayload {
   role: "user" | "model" | "assistant";
   text?: string;
   content?: string;
+  image?: {
+    data: string;
+    mimeType: string;
+    name?: string;
+  };
 }
 
 app.post("/api/chat", async (req: Request, res: Response): Promise<void> => {
@@ -821,19 +826,30 @@ app.post("/api/chat", async (req: Request, res: Response): Promise<void> => {
 
     const ai = getGeminiClient(getClientApiKey(req));
 
-    // Clean and normalize messages
-    const validMessages: Array<{ role: "user" | "model"; text: string }> = [];
+    // Clean and normalize messages with multimodal image support
+    const validMessages: Array<{
+      role: "user" | "model";
+      text: string;
+      image?: { data: string; mimeType: string; name?: string };
+    }> = [];
+
     for (const msg of messages) {
       if (!msg) continue;
-      const text = (msg.text ?? msg.content ?? "").trim();
-      if (!text) continue;
+      let text = (msg.text ?? msg.content ?? "").trim();
+      const hasImage = !!(msg.image && msg.image.data);
+
+      if (!text && !hasImage) continue;
+      if (!text && hasImage) {
+        text = "Analisis gambar atau tangkapan layar ini secara detail, berikan evaluasi, insight, serta saran pembuatan konten atau copy/caption yang relevan.";
+      }
+
       const role = (msg.role === "assistant" || msg.role === "model") ? "model" : "user";
       
-      // If consecutive messages have the same role, merge their content to keep Gemini alternation valid
-      if (validMessages.length > 0 && validMessages[validMessages.length - 1].role === role) {
+      // If consecutive messages have the same role and neither has an image, merge text
+      if (validMessages.length > 0 && validMessages[validMessages.length - 1].role === role && !hasImage && !validMessages[validMessages.length - 1].image) {
         validMessages[validMessages.length - 1].text += `\n\n${text}`;
       } else {
-        validMessages.push({ role, text });
+        validMessages.push({ role, text, image: msg.image });
       }
     }
 
@@ -847,11 +863,28 @@ app.post("/api/chat", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Map conversation history to Gemini contents format
-    const contents = validMessages.map((msg) => ({
-      role: msg.role,
-      parts: [{ text: msg.text }],
-    }));
+    // Map conversation history to Gemini multimodal contents format
+    const contents = validMessages.map((msg) => {
+      const parts: any[] = [];
+      if (msg.image && msg.image.data) {
+        let base64 = msg.image.data;
+        if (base64.includes("base64,")) {
+          base64 = base64.split("base64,")[1];
+        }
+        parts.push({
+          inlineData: {
+            mimeType: msg.image.mimeType || "image/jpeg",
+            data: base64,
+          },
+        });
+      }
+      parts.push({ text: msg.text });
+
+      return {
+        role: msg.role,
+        parts,
+      };
+    });
 
     const replyText = await generateAIContentWithFallback(ai, {
       contents,

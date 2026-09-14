@@ -45,11 +45,11 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
 
         {/* Heading & Notice as mandated */}
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mb-2">
-          Kuota Harian Habis
+          Kuota Harian AI Habis
         </h2>
 
         <p className="text-sm font-medium text-slate-700 mb-4 leading-relaxed">
-          Limit harian <span className="font-semibold text-amber-700">{featureLabel}</span> untuk akun FREE sudah habis. Coba lagi besok atau upgrade ke Premium.
+          Limit harian <span className="font-semibold text-amber-700">{featureLabel}</span> untuk akun FREE sudah mencapai batas maksimal (5× total penggunaan per hari). Coba lagi besok atau upgrade ke Premium.
         </p>
 
         {/* Informational Callout */}
@@ -57,11 +57,11 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
           <div className="flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
             <p>
-              Setiap fitur AI memiliki kuota terpisah <strong>5× per hari</strong> untuk akun <strong>FREE</strong>. Kuota akan di-reset otomatis besok (00:00).
+              Akun <strong>FREE</strong> memiliki kuota <strong>5× TOTAL penggunaan seluruh fitur AI per hari</strong>. Kuota akan di-reset otomatis setiap hari pada pukul 00:00 WIB.
             </p>
           </div>
           <p className="text-[11px] text-slate-500 pl-6.5">
-            Ingin berkarya tanpa batasan harian? Tingkatkan akun Anda ke paket Premium ARVIN STUDIO.
+            Ingin akses tanpa batas ke seluruh AI Creator Tools tanpa batasan harian? Tingkatkan akun Anda ke paket Premium ARVIN STUDIO.
           </p>
         </div>
 
@@ -74,9 +74,9 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
               onClose();
               onUpgrade();
             }}
-            className="flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold text-sm shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+            className="flex-1 py-3 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] cursor-pointer"
           >
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-4 h-4 text-amber-400" />
             <span>Upgrade ke Premium</span>
             <ArrowRight className="w-4 h-4" />
           </button>
