@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScriptPlatform,
   ScriptGoal,
@@ -28,6 +28,7 @@ import {
   Mic,
   Type,
   Award,
+  Lock,
 } from 'lucide-react';
 
 const PLATFORMS: ScriptPlatform[] = [
@@ -94,6 +95,30 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+
+  // 1x Lifetime Trial status for this feature
+  const [trialStatus, setTrialStatus] = useState<{
+    used: boolean;
+    remaining: number;
+    isPremium: boolean;
+  }>({ used: false, remaining: 1, isPremium: false });
+
+  const refreshTrial = async () => {
+    try {
+      const q = await canUseFeature('script-maker');
+      setTrialStatus({
+        used: Boolean(q.trialUsed),
+        remaining: q.remaining,
+        isPremium: q.isPremium,
+      });
+    } catch (err) {
+      console.warn('Error fetching script-maker trial status:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshTrial();
+  }, []);
 
   // Result state
   const [result, setResult] = useState<GenerateScriptResult | null>(null);
@@ -174,6 +199,7 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
 
       // Record quota consumption only on success
       await consumeFeatureUsage('script-maker');
+      setTrialStatus({ used: true, remaining: 0, isPremium: false });
 
       try {
         await recordAiUsage('Script Maker');
@@ -269,7 +295,7 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
               </button>
             )}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xl sm:text-2xl">🎬</span>
                 <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Script Maker
@@ -277,6 +303,19 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Tahap 6
                 </span>
+                {trialStatus.isPremium ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" /> Akses Unlimited (Premium)
+                  </span>
+                ) : trialStatus.used ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-rose-500" /> Trial Habis (Khusus Premium)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Kesempatan Gratis: 1x
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
                 Buat script konten yang terstruktur dan siap digunakan dengan bantuan AI.
@@ -521,14 +560,29 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
               <button
                 id="btn-generate-script"
                 type="button"
-                onClick={() => handleGenerate(false)}
+                onClick={() => {
+                  if (!trialStatus.isPremium && trialStatus.used) {
+                    setShowQuotaModal(true);
+                    return;
+                  }
+                  handleGenerate(false);
+                }}
                 disabled={isLoading}
-                className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-slate-900/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className={`w-full sm:w-auto px-6 py-3 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  !trialStatus.isPremium && trialStatus.used
+                    ? 'bg-slate-800 hover:bg-slate-900 border border-rose-500/30'
+                    : 'bg-slate-900 hover:bg-slate-800 active:bg-slate-950 shadow-slate-900/10'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin text-slate-300" />
                     <span>AI sedang menyusun script...</span>
+                  </>
+                ) : !trialStatus.isPremium && trialStatus.used ? (
+                  <>
+                    <Lock className="w-4 h-4 text-rose-400" />
+                    <span>Trial Habis • Buka Akses Premium</span>
                   </>
                 ) : (
                   <>
@@ -837,9 +891,10 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
         )}
       </div>
 
-      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      {/* Quota Exceeded Modal (1x Lifetime Trial Limit for FREE accounts) */}
       <QuotaExceededModal
         isOpen={showQuotaModal}
+        featureKey="script-maker"
         featureLabel="Script Maker"
         onClose={() => setShowQuotaModal(false)}
         onUpgrade={() => {

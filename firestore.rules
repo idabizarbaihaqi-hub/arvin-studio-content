@@ -70,8 +70,20 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // Match ai_daily_usage collection (global 5x limit per userId_date)
+    // Match ai_daily_usage collection (tracked per userId_date)
     match /ai_daily_usage/{usageId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow update: if isSuperAdmin() || (
+        isAuthenticated() && request.resource.data.userId == request.auth.uid &&
+        (resource == null || resource.data.userId == request.auth.uid)
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Match feature_trials collection (lifetime trial per feature per userId)
+    match /feature_trials/{trialId} {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isSuperAdmin());
       allow list: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
       allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isSuperAdmin());

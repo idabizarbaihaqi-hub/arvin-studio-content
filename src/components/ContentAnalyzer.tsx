@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   PlatformType,
   ContentCategoryType,
@@ -22,6 +22,7 @@ import {
   Lightbulb,
   ArrowLeft,
   Share2,
+  Lock,
 } from 'lucide-react';
 
 const PLATFORMS: PlatformType[] = [
@@ -63,6 +64,30 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, 
   const [result, setResult] = useState<ContentAnalysisResult | null>(null);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
 
+  // 1x Lifetime Trial status for this feature
+  const [trialStatus, setTrialStatus] = useState<{
+    used: boolean;
+    remaining: number;
+    isPremium: boolean;
+  }>({ used: false, remaining: 1, isPremium: false });
+
+  const refreshTrial = async () => {
+    try {
+      const q = await canUseFeature('content-analyzer');
+      setTrialStatus({
+        used: Boolean(q.trialUsed),
+        remaining: q.remaining,
+        isPremium: q.isPremium,
+      });
+    } catch (err) {
+      console.warn('Error fetching content-analyzer trial status:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshTrial();
+  }, []);
+
   // Copy feedback state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -99,6 +124,7 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, 
 
       // Record quota consumption only on success
       await consumeFeatureUsage('content-analyzer');
+      setTrialStatus({ used: true, remaining: 0, isPremium: false });
 
       try {
         await recordAiUsage('Content Analyzer');
@@ -182,9 +208,24 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, 
               <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-                Content Analyzer
-              </h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
+                  Content Analyzer
+                </h1>
+                {trialStatus.isPremium ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" /> Akses Unlimited (Premium)
+                  </span>
+                ) : trialStatus.used ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-rose-500" /> Trial Habis (Khusus Premium)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Kesempatan Gratis: 1x
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
                 Evaluasi kualitas konten sebelum dipublikasikan dengan kurasi AI
               </p>
@@ -603,14 +644,29 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, 
             <button
               id="btn-run-analysis"
               type="button"
-              onClick={handleAnalyze}
+              onClick={() => {
+                if (!trialStatus.isPremium && trialStatus.used) {
+                  setShowQuotaModal(true);
+                  return;
+                }
+                handleAnalyze();
+              }}
               disabled={isLoading}
-              className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 disabled:bg-slate-400 text-white font-bold text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 shadow-md shadow-slate-900/15 transition-all"
+              className={`w-full py-3.5 sm:py-4 px-6 rounded-2xl text-white font-bold text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
+                !trialStatus.isPremium && trialStatus.used
+                  ? 'bg-slate-800 hover:bg-slate-900 border border-rose-500/30'
+                  : 'bg-slate-900 hover:bg-slate-800 active:bg-slate-950 shadow-slate-900/15'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isLoading ? (
                 <>
                   <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                   <span>ARVIN AI sedang menganalisis...</span>
+                </>
+              ) : !trialStatus.isPremium && trialStatus.used ? (
+                <>
+                  <Lock className="w-4 h-4 text-rose-400" />
+                  <span>Trial Habis • Buka Akses Premium</span>
                 </>
               ) : (
                 <>
@@ -633,9 +689,10 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, 
         </div>
       )}
 
-      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      {/* Quota Exceeded Modal (1x Lifetime Trial Limit for FREE accounts) */}
       <QuotaExceededModal
         isOpen={showQuotaModal}
+        featureKey="content-analyzer"
         featureLabel="Content Analyzer"
         onClose={() => setShowQuotaModal(false)}
         onUpgrade={() => {

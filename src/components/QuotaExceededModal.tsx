@@ -1,8 +1,9 @@
 import React from 'react';
-import { Sparkles, AlertCircle, X, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Sparkles, AlertCircle, X, ArrowRight, ShieldAlert, Lock, Clock } from 'lucide-react';
 
 interface QuotaExceededModalProps {
   isOpen: boolean;
+  featureKey?: string;
   featureLabel?: string;
   onClose: () => void;
   onUpgrade: () => void;
@@ -10,11 +11,14 @@ interface QuotaExceededModalProps {
 
 export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
   isOpen,
+  featureKey = '',
   featureLabel = 'fitur ini',
   onClose,
   onUpgrade,
 }) => {
   if (!isOpen) return null;
+
+  const isChat = featureKey === 'chat' || featureLabel.toLowerCase().includes('chat');
 
   return (
     <div
@@ -33,23 +37,33 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
           type="button"
           onClick={onClose}
           aria-label="Tutup"
-          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Warning Icon Badge */}
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-5 shadow-xs">
-          <ShieldAlert className="w-7 h-7" />
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 shadow-xs ${
+          isChat ? 'bg-amber-50 border border-amber-200 text-amber-600' : 'bg-rose-50 border border-rose-200 text-rose-600'
+        }`}>
+          {isChat ? <Clock className="w-7 h-7" /> : <Lock className="w-7 h-7" />}
         </div>
 
-        {/* Heading & Notice as mandated */}
+        {/* Heading & Notice */}
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mb-2">
-          Kuota Harian AI Habis
+          {isChat ? 'Limit Harian Chat AI Habis' : 'Kesempatan Trial Gratis Habis'}
         </h2>
 
         <p className="text-sm font-medium text-slate-700 mb-4 leading-relaxed">
-          Limit harian <span className="font-semibold text-amber-700">{featureLabel}</span> untuk akun FREE sudah mencapai batas maksimal (5× total penggunaan per hari). Coba lagi besok atau upgrade ke Premium.
+          {isChat ? (
+            <>
+              Free credit harian <span className="font-semibold text-amber-700">Chat AI</span> untuk akun FREE sudah mencapai batas maksimal (3× per hari). Coba lagi besok atau upgrade ke Premium untuk chat tanpa batas.
+            </>
+          ) : (
+            <>
+              Kesempatan trial gratis (1×) untuk <span className="font-semibold text-amber-700">{featureLabel}</span> pada akun ini sudah digunakan. Upgrade ke Premium untuk membuka akses tanpa batas.
+            </>
+          )}
         </p>
 
         {/* Informational Callout */}
@@ -57,11 +71,19 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
           <div className="flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
             <p>
-              Akun <strong>FREE</strong> memiliki kuota <strong>5× TOTAL penggunaan seluruh fitur AI per hari</strong>. Kuota akan di-reset otomatis setiap hari pada pukul 00:00 WIB.
+              {isChat ? (
+                <>
+                  Akun <strong>FREE</strong> mendapatkan <strong>3 kredit Chat AI gratis setiap hari</strong>. Kuota akan di-reset otomatis setiap hari baru pada pukul 00:00 WIB.
+                </>
+              ) : (
+                <>
+                  Akun <strong>FREE</strong> mendapatkan <strong>1× kesempatan trial gratis seumur hidup</strong> untuk masing-masing fitur AI lainnya.
+                </>
+              )}
             </p>
           </div>
           <p className="text-[11px] text-slate-500 pl-6.5">
-            Ingin akses tanpa batas ke seluruh AI Creator Tools tanpa batasan harian? Tingkatkan akun Anda ke paket Premium ARVIN STUDIO.
+            Ingin akses tanpa batas ke seluruh AI Creator Tools ARVIN STUDIO? Tingkatkan akun Anda ke paket Premium aktif sekarang.
           </p>
         </div>
 
@@ -85,7 +107,7 @@ export const QuotaExceededModal: React.FC<QuotaExceededModalProps> = ({
             id="btn-dismiss-quota"
             type="button"
             onClick={onClose}
-            className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors"
+            className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm transition-colors cursor-pointer"
           >
             Nanti Saja
           </button>

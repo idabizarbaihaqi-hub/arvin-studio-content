@@ -562,6 +562,12 @@ export interface AnalyticsSummary {
 // TAHAP 8: ACCOUNT, PROFILE, SUBSCRIPTION, & CREDITS
 // ----------------------------------------------------
 
+export interface ChatDailyUsage {
+  date: string;
+  count: number;
+  lastUsedAt?: string | null;
+}
+
 export interface UserProfile {
   id: string;
   uid: string;
@@ -575,6 +581,9 @@ export interface UserProfile {
   plan: 'FREE' | 'PREMIUM';
   subscriptionStatus: 'INACTIVE' | 'ACTIVE' | 'PENDING';
   subscriptionExpiry?: string | null;
+  // Free Credit & Trial tracking per UID
+  chatAiUsage?: ChatDailyUsage;
+  featureTrials?: Record<string, boolean>;
   // Backwards compatibility
   displayName?: string;
   credits?: number;
@@ -683,6 +692,8 @@ export interface FeatureUsageStatus {
   limit: number;
   remaining: number;
   isExceeded: boolean;
+  isLifetimeTrial?: boolean;
+  trialUsed?: boolean;
 }
 
 export interface UsageLimitCheckResult {
@@ -692,7 +703,9 @@ export interface UsageLimitCheckResult {
   limit: number;
   remaining: number;
   isPremium: boolean;
-  reason?: 'DAILY_LIMIT_REACHED' | 'EXPIRED_FALLBACK_TO_FREE' | 'ALLOWED';
+  isLifetimeTrial?: boolean;
+  trialUsed?: boolean;
+  reason?: 'DAILY_LIMIT_REACHED' | 'TRIAL_ALREADY_USED' | 'EXPIRED_FALLBACK_TO_FREE' | 'ALLOWED';
 }
 
 export interface AccountSummary {

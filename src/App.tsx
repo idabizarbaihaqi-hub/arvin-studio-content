@@ -8,6 +8,7 @@ import {
   subscribeToAuth,
   canUseFeature,
   consumeFeatureUsage,
+  getChatDailyUsage,
 } from './services/accessControlService';
 import { recordAiUsage, saveAiHistory } from './services/storageService';
 import {
@@ -21,6 +22,7 @@ import { EmptyState } from './components/EmptyState';
 import { ChatMessageItem } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { LoadingIndicator } from './components/LoadingIndicator';
+import { QuotaExceededModal } from './components/QuotaExceededModal';
 import { ContentAnalyzer } from './components/ContentAnalyzer';
 import { ContentIdeas } from './components/ContentIdeas';
 import { CaptionMaker } from './components/CaptionMaker';
@@ -62,6 +64,30 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
   const [placeholderItem, setPlaceholderItem] = useState<MenuItem | null>(null);
+
+  // Chat AI daily quota tracking (3 Free Credit / day for FREE users, unlimited for Premium)
+  const [chatQuota, setChatQuota] = useState<{
+    count: number;
+    limit: number;
+    remaining: number;
+    isPremium: boolean;
+  }>({ count: 0, limit: 3, remaining: 3, isPremium: false });
+  const [showChatQuotaModal, setShowChatQuotaModal] = useState(false);
+
+  const refreshChatQuota = async () => {
+    try {
+      const q = await getChatDailyUsage();
+      setChatQuota(q);
+    } catch (err) {
+      console.warn('Error fetching Chat AI quota:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      refreshChatQuota();
+    }
+  }, [currentUser, activeView]);
 
   // Load & isolate chat history per authenticated user account
   const activeUserId = currentUser?.id || null;
@@ -200,13 +226,14 @@ export default function App() {
       textToSend = 'Tolong analisis gambar atau screenshot ini secara detail, berikan evaluasi insight, dan rekomendasi pembuatan konten atau copy/caption yang relevan.';
     }
 
-    // Check daily usage quota for FREE accounts (5x/day global limit)
+    // Check daily usage quota for FREE accounts (3x/day Chat AI)
     const quotaCheck = await canUseFeature('chat');
     if (!quotaCheck.allowed) {
+      setShowChatQuotaModal(true);
       const quotaErrorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'model',
-        text: 'Limit harian AI untuk akun FREE sudah mencapai batas maksimal (5× per hari). Coba lagi besok atau upgrade ke Premium.',
+        text: 'Limit harian Chat AI untuk akun FREE sudah mencapai batas maksimal (3× per hari). Kuota akan di-reset otomatis besok (00:00 WIB), atau upgrade ke Premium untuk chat tanpa batas.',
         timestamp: new Date(),
         isError: true,
       };
@@ -246,7 +273,12 @@ export default function App() {
       const replyText = await sendChatMessage(historyPayload);
 
       // Record quota consumption on success
-      await consumeFeatureUsage('chat');
+      const consumeRes = await consumeFeatureUsage('chat');
+      setChatQuota((prev) => ({
+        ...prev,
+        count: 3 - consumeRes.remaining,
+        remaining: consumeRes.remaining,
+      }));
 
       // Auto-save chat history
       try {
@@ -551,14 +583,72 @@ export default function App() {
             </div>
           </main>
 
-          {/* Chat Input Container */}
+          {/* Chat Input Container with Free Credit Status Indicator */}
           <footer id="chat-footer" className="w-full shrink-0">
+            {/* Chat AI Credit Status Pill */}
+            <div className="max-w-3xl mx-auto px-4 pb-1 flex items-center justify-between text-xs text-slate-500 select-none">
+              <div className="flex items-center gap-2 font-medium">
+                <span
+                  className={`inline-block w-2 h-2 rounded-full ${
+                    chatQuota.isPremium
+                      ? 'bg-amber-500'
+                      : chatQuota.remaining > 0
+                      ? 'bg-emerald-500'
+                      : 'bg-rose-500'
+                  }`}
+                />
+                {chatQuota.isPremium ? (
+                  <span className="text-amber-700 font-semibold flex items-center gap-1">
+                    Chat AI: Akses Tanpa Batas (Premium)
+                  </span>
+                ) : (
+                  <span>
+                    Chat AI Gratis: <strong className="text-slate-800">{chatQuota.remaining}/3</strong> hari ini
+                    {chatQuota.remaining === 0 && (
+                      <span className="text-rose-600 font-bold ml-1.5">
+                        (Limit Tercapai)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              {!chatQuota.isPremium && (
+                <div>
+                  {chatQuota.remaining === 0 ? (
+                    <button
+                      id="btn-upgrade-from-chat-footer"
+                      type="button"
+                      onClick={() => setActiveView('premium')}
+                      className="text-amber-600 hover:text-amber-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      Upgrade ke Premium &rarr;
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">
+                      Reset: 00:00 WIB
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             <ChatInput
               value={inputText}
               onChange={setInputText}
-              onSend={() => handleSendMessage()}
+              onSend={() => {
+                if (!chatQuota.isPremium && chatQuota.remaining === 0) {
+                  setShowChatQuotaModal(true);
+                  return;
+                }
+                handleSendMessage();
+              }}
               isLoading={isLoading}
-              placeholder="Tulis pesan atau unggah gambar/screenshot..."
+              placeholder={
+                !chatQuota.isPremium && chatQuota.remaining === 0
+                  ? 'Limit Chat AI harian (3/3) telah habis. Upgrade ke Premium untuk melanjutkan...'
+                  : 'Tulis pesan atau unggah gambar/screenshot...'
+              }
               attachedImage={attachedImage}
               onAttachImage={setAttachedImage}
             />
@@ -599,6 +689,18 @@ export default function App() {
         onNewChat={handleNewChat}
         messageCount={messages.length}
         onNavigate={setActiveView}
+      />
+
+      {/* Quota Exceeded Modal for Chat AI */}
+      <QuotaExceededModal
+        isOpen={showChatQuotaModal}
+        featureKey="chat"
+        featureLabel="Chat AI"
+        onClose={() => setShowChatQuotaModal(false)}
+        onUpgrade={() => {
+          setShowChatQuotaModal(false);
+          setActiveView('premium');
+        }}
       />
     </div>
   );

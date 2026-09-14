@@ -709,7 +709,11 @@ export async function uploadPaymentProof(
 }
 
 // ----------------------------------------------------
-// DAILY USAGE LIMIT (GLOBAL 5x PER DAY ACROSS ALL AI TOOLS)
+// ----------------------------------------------------
+// ATURAN FREE CREDIT & TRIAL ARVIN STUDIO
+// A. CHAT AI (Halaman Awal/Dashboard): 3 Free Credit setiap hari (reset harian).
+// B. SEMUA FITUR AI LAINNYA: 1x Kesempatan Trial Gratis seumur hidup akun per fitur (tidak reset).
+// Premium & Super Admin: Bebas/Unlimited tanpa batas.
 // ----------------------------------------------------
 
 export function getTodayDateString(): string {
@@ -720,128 +724,379 @@ export function getTodayDateString(): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Checks if current user can use a given feature.
+ * - Chat AI: 3 free uses per day for FREE users, resets daily.
+ * - Other AI features: 1 free trial lifetime per feature per account.
+ * - Premium & Super Admin: always allowed (unlimited).
+ */
 export async function canUseFeature(feature: AiFeatureKey): Promise<UsageLimitCheckResult> {
   const uid = auth.currentUser?.uid;
   if (!uid) {
     return {
       allowed: false,
       feature,
-      count: 5,
-      limit: 5,
+      count: feature === 'chat' ? 3 : 1,
+      limit: feature === 'chat' ? 3 : 1,
       remaining: 0,
       isPremium: false,
-      reason: 'DAILY_LIMIT_REACHED',
+      isLifetimeTrial: feature !== 'chat',
+      trialUsed: feature !== 'chat',
+      reason: feature === 'chat' ? 'DAILY_LIMIT_REACHED' : 'TRIAL_ALREADY_USED',
     };
   }
 
-  // 1. Check if user is PREMIUM
+  // 1. Check Super Admin (Super Admin bypasses all quotas)
+  try {
+    const profile = await getUserProfile(uid);
+    if (isSuperAdminUser(profile)) {
+      return {
+        allowed: true,
+        feature,
+        count: 0,
+        limit: 9999,
+        remaining: 9999,
+        isPremium: true,
+        isLifetimeTrial: feature !== 'chat',
+        trialUsed: false,
+        reason: 'ALLOWED',
+      };
+    }
+  } catch (err) {
+    console.warn('[Quota Check] Could not verify superadmin profile:', err);
+  }
+
+  // 2. Check active Premium subscription (Premium has unlimited access)
   const premiumActive = await isPremium();
   if (premiumActive) {
     return {
       allowed: true,
       feature,
       count: 0,
-      limit: 999,
-      remaining: 999,
+      limit: 9999,
+      remaining: 9999,
       isPremium: true,
+      isLifetimeTrial: feature !== 'chat',
+      trialUsed: false,
       reason: 'ALLOWED',
     };
   }
 
-  // 2. User is FREE -> check GLOBAL daily usage across all AI features for today
+  // 3. User is FREE account
+  const now = new Date().toISOString();
   const dateStr = getTodayDateString();
-  const globalDocId = `${uid}_${dateStr}`;
-  const globalDocRef = doc(db, 'ai_daily_usage', globalDocId);
+
+  // === KATEGORI A: CHAT AI DI HALAMAN AWAL (3x per hari, reset harian) ===
+  if (feature === 'chat') {
+    const CHAT_DAILY_LIMIT = 3;
+    let todayChatCount = 0;
+
+    try {
+      // Check user document directly
+      const userDocRef = doc(db, 'users', uid);
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData?.chatAiUsage?.date === dateStr) {
+          todayChatCount = Number(uData.chatAiUsage.count || 0);
+        }
+      }
+
+      // Secondary check in ai_daily_usage collection
+      if (todayChatCount === 0) {
+        const dailyDocRef = doc(db, 'ai_daily_usage', `${uid}_${dateStr}`);
+        const dailySnap = await getDoc(dailyDocRef);
+        if (dailySnap.exists()) {
+          todayChatCount = Number(dailySnap.data()?.chatUsage || 0);
+        }
+      }
+    } catch (err) {
+      console.warn('[Quota Check] Error checking Chat AI usage:', err);
+    }
+
+    const remaining = Math.max(0, CHAT_DAILY_LIMIT - todayChatCount);
+    const isExceeded = todayChatCount >= CHAT_DAILY_LIMIT;
+
+    return {
+      allowed: !isExceeded,
+      feature: 'chat',
+      count: todayChatCount,
+      limit: CHAT_DAILY_LIMIT,
+      remaining,
+      isPremium: false,
+      isLifetimeTrial: false,
+      trialUsed: false,
+      reason: isExceeded ? 'DAILY_LIMIT_REACHED' : 'ALLOWED',
+    };
+  }
+
+  // === KATEGORI B: SEMUA FITUR AI LAINNYA (1x seumur hidup akun, TIDAK reset) ===
+  const FEATURE_LIFETIME_LIMIT = 1;
+  let isTrialUsed = false;
 
   try {
-    const snap = await getDoc(globalDocRef);
-    let totalCount = 0;
-    if (snap.exists()) {
-      totalCount = Number(snap.data()?.totalUsage || 0);
-    } else {
-      // Fallback check to legacy ai_usage if daily document not yet seeded today
-      const legacyDocRef = doc(db, 'ai_usage', `${uid}_${feature}_${dateStr}`);
-      const legacySnap = await getDoc(legacyDocRef);
-      if (legacySnap.exists()) {
-        totalCount = Number(legacySnap.data()?.usageCount || 0);
+    // 1. Check user profile field `featureTrials`
+    const userDocRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      const uData = userSnap.data();
+      if (uData?.featureTrials?.[feature] === true) {
+        isTrialUsed = true;
       }
     }
 
-    const limit = 5;
-    const remaining = Math.max(0, limit - totalCount);
-
-    if (totalCount >= limit) {
-      return {
-        allowed: false,
-        feature,
-        count: totalCount,
-        limit,
-        remaining: 0,
-        isPremium: false,
-        reason: 'DAILY_LIMIT_REACHED',
-      };
+    // 2. Check dedicated feature_trials collection
+    if (!isTrialUsed) {
+      const trialDocRef = doc(db, 'feature_trials', uid);
+      const trialSnap = await getDoc(trialDocRef);
+      if (trialSnap.exists()) {
+        const tData = trialSnap.data();
+        if (tData?.[feature]?.used === true || tData?.[feature] === true) {
+          isTrialUsed = true;
+        }
+      }
     }
 
-    return {
-      allowed: true,
-      feature,
-      count: totalCount,
-      limit,
-      remaining,
-      isPremium: false,
-      reason: 'ALLOWED',
-    };
+    // 3. Fallback check: check historical ai_usage collection
+    if (!isTrialUsed) {
+      const q = query(
+        collection(db, 'ai_usage'),
+        where('userId', '==', uid),
+        where('feature', '==', feature)
+      );
+      const usageSnap = await getDocs(q);
+      if (!usageSnap.empty) {
+        isTrialUsed = true;
+      }
+    }
   } catch (err) {
-    console.error('Error checking global usage limit in Firestore:', err);
-    return {
-      allowed: true,
-      feature,
-      count: 0,
-      limit: 5,
-      remaining: 5,
-      isPremium: false,
-      reason: 'ALLOWED',
-    };
+    console.warn(`[Quota Check] Error checking trial for ${feature}:`, err);
   }
+
+  const count = isTrialUsed ? 1 : 0;
+  const remaining = isTrialUsed ? 0 : 1;
+
+  return {
+    allowed: !isTrialUsed,
+    feature,
+    count,
+    limit: FEATURE_LIFETIME_LIMIT,
+    remaining,
+    isPremium: false,
+    isLifetimeTrial: true,
+    trialUsed: isTrialUsed,
+    reason: isTrialUsed ? 'TRIAL_ALREADY_USED' : 'ALLOWED',
+  };
 }
 
-export async function getGlobalDailyUsage(): Promise<{
-  totalUsage: number;
-  limit: number;
-  remaining: number;
-  isPremium: boolean;
-  featureBreakdown: Record<string, number>;
-}> {
+/**
+ * Consumes credit/trial for a given feature.
+ * ONLY called after AI generation genuinely succeeds.
+ * - Chat AI: increments daily count (0 -> 1 -> 2 -> 3) tied to today's date.
+ * - Other AI features: marks trial permanently used (lifetime) for this UID.
+ */
+export async function consumeFeatureUsage(
+  feature: AiFeatureKey
+): Promise<{ success: boolean; remaining: number }> {
   const uid = auth.currentUser?.uid;
-  if (!uid) {
-    return { totalUsage: 0, limit: 5, remaining: 5, isPremium: false, featureBreakdown: {} };
-  }
+  if (!uid) return { success: false, remaining: 0 };
 
-  const premiumActive = await isPremium();
-  if (premiumActive) {
-    return { totalUsage: 0, limit: 999, remaining: 999, isPremium: true, featureBreakdown: {} };
+  // Premium & Super Admin are not limited
+  try {
+    const profile = await getUserProfile(uid);
+    if (isSuperAdminUser(profile)) {
+      return { success: true, remaining: 9999 };
+    }
+  } catch {}
+
+  const premium = await isPremium();
+  if (premium) {
+    return { success: true, remaining: 9999 };
   }
 
   const dateStr = getTodayDateString();
-  const globalDocId = `${uid}_${dateStr}`;
-  try {
-    const snap = await getDoc(doc(db, 'ai_daily_usage', globalDocId));
-    if (snap.exists()) {
-      const data = snap.data();
-      const totalUsage = Number(data.totalUsage || 0);
-      return {
-        totalUsage,
-        limit: 5,
-        remaining: Math.max(0, 5 - totalUsage),
-        isPremium: false,
-        featureBreakdown: data.featureBreakdown || {},
-      };
+  const now = new Date().toISOString();
+
+  // === CASE 1: CHAT AI (Halaman Awal) - 3x per hari ===
+  if (feature === 'chat') {
+    const userDocRef = doc(db, 'users', uid);
+    const dailyDocRef = doc(db, 'ai_daily_usage', `${uid}_${dateStr}`);
+
+    try {
+      // Determine current chat count for today
+      let currentCount = 0;
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData?.chatAiUsage?.date === dateStr) {
+          currentCount = Number(uData.chatAiUsage.count || 0);
+        }
+      }
+
+      if (currentCount === 0) {
+        const dailySnap = await getDoc(dailyDocRef);
+        if (dailySnap.exists()) {
+          currentCount = Number(dailySnap.data()?.chatUsage || 0);
+        }
+      }
+
+      const newCount = currentCount + 1;
+
+      // 1. Update user document
+      await setDoc(
+        userDocRef,
+        {
+          chatAiUsage: {
+            date: dateStr,
+            count: newCount,
+            lastUsedAt: now,
+          },
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // 2. Update ai_daily_usage collection
+      await setDoc(
+        dailyDocRef,
+        {
+          id: `${uid}_${dateStr}`,
+          userId: uid,
+          date: dateStr,
+          chatUsage: newCount,
+          lastFeature: 'chat',
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      const remaining = Math.max(0, 3 - newCount);
+      console.log(`[Chat AI Credit] UID ${uid}: count = ${newCount}/3, remaining = ${remaining}`);
+      return { success: true, remaining };
+    } catch (err) {
+      console.error('[Chat AI Credit] Error updating Chat AI usage:', err);
+      return { success: false, remaining: 0 };
     }
-  } catch (err) {
-    console.error('Error getting global daily usage:', err);
   }
 
-  return { totalUsage: 0, limit: 5, remaining: 5, isPremium: false, featureBreakdown: {} };
+  // === CASE 2: FITUR AI LAINNYA (1x seumur hidup akun, permanen) ===
+  const userDocRef = doc(db, 'users', uid);
+  const trialDocRef = doc(db, 'feature_trials', uid);
+  const usageHistoryRef = doc(db, 'ai_usage', `${uid}_${feature}_${Date.now()}`);
+
+  try {
+    // 1. Mark feature trial used on user profile document
+    const userSnap = await getDoc(userDocRef);
+    const existingTrials = userSnap.exists() ? userSnap.data()?.featureTrials || {} : {};
+    const updatedTrials = {
+      ...existingTrials,
+      [feature]: true,
+    };
+
+    await setDoc(
+      userDocRef,
+      {
+        featureTrials: updatedTrials,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    // 2. Persist in feature_trials collection
+    await setDoc(
+      trialDocRef,
+      {
+        id: uid,
+        userId: uid,
+        [feature]: {
+          used: true,
+          usedAt: now,
+        },
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    // 3. Record in ai_usage collection for audit / tracking
+    await setDoc(
+      usageHistoryRef,
+      {
+        userId: uid,
+        feature,
+        usedAt: now,
+        type: 'FREE_TRIAL_1X',
+      },
+      { merge: true }
+    );
+
+    console.log(`[Feature Trial] UID ${uid} consumed 1x lifetime trial for ${feature}`);
+    return { success: true, remaining: 0 };
+  } catch (err) {
+    console.error(`[Feature Trial] Error consuming trial for ${feature}:`, err);
+    return { success: false, remaining: 0 };
+  }
+}
+
+/**
+ * Returns the Chat AI daily usage status for current user.
+ */
+export async function getChatDailyUsage(): Promise<{
+  count: number;
+  limit: number;
+  remaining: number;
+  isPremium: boolean;
+}> {
+  const check = await canUseFeature('chat');
+  return {
+    count: check.count,
+    limit: check.limit,
+    remaining: check.remaining,
+    isPremium: check.isPremium,
+  };
+}
+
+/**
+ * Returns the trial status for a specific AI feature.
+ */
+export async function getFeatureTrialStatus(feature: AiFeatureKey): Promise<{
+  used: boolean;
+  remaining: number;
+  isPremium: boolean;
+}> {
+  const check = await canUseFeature(feature);
+  return {
+    used: Boolean(check.trialUsed),
+    remaining: check.remaining,
+    isPremium: check.isPremium,
+  };
+}
+
+/**
+ * Returns trial statuses for all non-chat AI features.
+ */
+export async function getAllFeatureTrialStatuses(): Promise<
+  Record<AiFeatureKey, { used: boolean; remaining: number; isPremium: boolean }>
+> {
+  const allFeatures: AiFeatureKey[] = [
+    'chat',
+    'content-analyzer',
+    'content-ideas',
+    'caption-maker',
+    'hook-generator',
+    'script-maker',
+    'hashtag-generator',
+  ];
+
+  const results: any = {};
+  for (const feat of allFeatures) {
+    const status = await canUseFeature(feat);
+    results[feat] = {
+      used: feat === 'chat' ? status.count >= status.limit : Boolean(status.trialUsed),
+      remaining: status.remaining,
+      isPremium: status.isPremium,
+    };
+  }
+  return results;
 }
 
 export async function getRemainingDailyUsage(
@@ -853,87 +1108,6 @@ export async function getRemainingDailyUsage(
     limit: check.limit,
     remaining: check.remaining,
   };
-}
-
-/**
- * Increments global AI usage count (ai_daily_usage) and per-feature record (ai_usage)
- * only after AI generation successfully finishes.
- */
-export async function consumeFeatureUsage(
-  feature: AiFeatureKey
-): Promise<{ success: boolean; remaining: number }> {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return { success: false, remaining: 0 };
-
-  const premium = await isPremium();
-  if (premium) {
-    return { success: true, remaining: 999 };
-  }
-
-  const dateStr = getTodayDateString();
-  const now = new Date().toISOString();
-
-  // 1. Update Global 5x limit in ai_daily_usage/{userId}_{date}
-  const globalDocId = `${uid}_${dateStr}`;
-  const globalDocRef = doc(db, 'ai_daily_usage', globalDocId);
-
-  // 2. Also keep per-feature count in ai_usage/{userId}_{feature}_{date} for analytics
-  const featureDocId = `${uid}_${feature}_${dateStr}`;
-  const featureDocRef = doc(db, 'ai_usage', featureDocId);
-
-  try {
-    const globalSnap = await getDoc(globalDocRef);
-    const currentTotal = globalSnap.exists() ? Number(globalSnap.data()?.totalUsage || 0) : 0;
-    const newTotal = currentTotal + 1;
-    const currentBreakdown = globalSnap.exists() ? (globalSnap.data()?.featureBreakdown || {}) : {};
-    const updatedBreakdown = {
-      ...currentBreakdown,
-      [feature]: (Number(currentBreakdown[feature]) || 0) + 1,
-    };
-
-    await setDoc(
-      globalDocRef,
-      {
-        id: globalDocId,
-        userId: uid,
-        date: dateStr,
-        totalUsage: newTotal,
-        limit: 5,
-        featureBreakdown: updatedBreakdown,
-        lastUsedFeature: feature,
-        createdAt: (globalSnap.exists() && globalSnap.data()?.createdAt) ? globalSnap.data()?.createdAt : now,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
-
-    // Update per-feature doc
-    try {
-      const featSnap = await getDoc(featureDocRef);
-      const featCount = featSnap.exists() ? Number(featSnap.data()?.usageCount || 0) : 0;
-      await setDoc(
-        featureDocRef,
-        {
-          id: featureDocId,
-          userId: uid,
-          feature,
-          date: dateStr,
-          usageCount: featCount + 1,
-          createdAt: (featSnap.exists() && featSnap.data()?.createdAt) ? featSnap.data()?.createdAt : now,
-          updatedAt: now,
-        },
-        { merge: true }
-      );
-    } catch (featErr) {
-      console.warn('Non-fatal: could not update per-feature ai_usage record:', featErr);
-    }
-
-    const remaining = Math.max(0, 5 - newTotal);
-    return { success: true, remaining };
-  } catch (err) {
-    console.error('Error incrementing global usage count:', err);
-    return { success: false, remaining: 0 };
-  }
 }
 
 // ----------------------------------------------------
@@ -1013,40 +1187,63 @@ export async function getAccountSummary(): Promise<AccountSummary> {
   const dateStr = getTodayDateString();
   const dailyUsageMap: Record<AiFeatureKey, FeatureUsageStatus> = {} as any;
 
-  // Read global daily usage for Free user
-  let globalTotal = 0;
-  try {
-    const globalSnap = await getDoc(doc(db, 'ai_daily_usage', `${uid}_${dateStr}`));
-    if (globalSnap.exists()) {
-      globalTotal = Number(globalSnap.data()?.totalUsage || 0);
-    }
-  } catch {
-    globalTotal = 0;
+  // Determine chat usage for today
+  let chatCount = 0;
+  if (profile.chatAiUsage && profile.chatAiUsage.date === dateStr) {
+    chatCount = Number(profile.chatAiUsage.count || 0);
+  } else {
+    try {
+      const dailySnap = await getDoc(doc(db, 'ai_daily_usage', `${uid}_${dateStr}`));
+      if (dailySnap.exists()) {
+        chatCount = Number(dailySnap.data()?.chatUsage || 0);
+      }
+    } catch {}
   }
 
+  // Determine feature trials
+  const trialsMap = profile.featureTrials || {};
+
   for (const feat of allFeatures) {
-    const usageDocId = `${uid}_${feat}_${dateStr}`;
-    let featCount = 0;
-    try {
-      const snap = await getDoc(doc(db, 'ai_usage', usageDocId));
-      if (snap.exists()) {
-        featCount = Number(snap.data()?.usageCount || 0);
+    if (feat === 'chat') {
+      const limit = premium ? 999 : 3;
+      const remaining = premium ? 999 : Math.max(0, 3 - chatCount);
+      dailyUsageMap[feat] = {
+        feature: feat,
+        featureLabel: AI_FEATURE_LABELS[feat] || feat,
+        count: chatCount,
+        limit,
+        remaining,
+        isExceeded: !premium && chatCount >= 3,
+        isLifetimeTrial: false,
+        trialUsed: false,
+      };
+    } else {
+      let isTrialUsed = Boolean(trialsMap[feat]);
+      if (!isTrialUsed) {
+        try {
+          const tSnap = await getDoc(doc(db, 'feature_trials', uid));
+          if (tSnap.exists()) {
+            const data = tSnap.data();
+            if (data?.[feat]?.used === true || data?.[feat] === true) {
+              isTrialUsed = true;
+            }
+          }
+        } catch {}
       }
-    } catch {
-      featCount = 0;
+
+      const limit = premium ? 999 : 1;
+      const remaining = premium ? 999 : (isTrialUsed ? 0 : 1);
+      dailyUsageMap[feat] = {
+        feature: feat,
+        featureLabel: AI_FEATURE_LABELS[feat] || feat,
+        count: isTrialUsed ? 1 : 0,
+        limit,
+        remaining,
+        isExceeded: !premium && isTrialUsed,
+        isLifetimeTrial: true,
+        trialUsed: isTrialUsed,
+      };
     }
-
-    const limit = premium ? 999 : 5;
-    const remaining = premium ? 999 : Math.max(0, 5 - globalTotal);
-
-    dailyUsageMap[feat] = {
-      feature: feat,
-      featureLabel: AI_FEATURE_LABELS[feat] || feat,
-      count: premium ? featCount : globalTotal,
-      limit,
-      remaining,
-      isExceeded: !premium && globalTotal >= 5,
-    };
   }
 
   const subscription: UserSubscription = {

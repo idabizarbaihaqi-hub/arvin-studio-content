@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IdeaPlatform,
   IdeaGoal,
@@ -31,6 +31,7 @@ import {
   Radio,
   Share2,
   Zap,
+  Lock,
 } from 'lucide-react';
 
 const PLATFORMS: IdeaPlatform[] = [
@@ -107,6 +108,30 @@ export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat, onNavi
   const [ideas, setIdeas] = useState<ContentIdeaItem[] | null>(null);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
 
+  // 1x Lifetime Trial status for this feature
+  const [trialStatus, setTrialStatus] = useState<{
+    used: boolean;
+    remaining: number;
+    isPremium: boolean;
+  }>({ used: false, remaining: 1, isPremium: false });
+
+  const refreshTrial = async () => {
+    try {
+      const q = await canUseFeature('content-ideas');
+      setTrialStatus({
+        used: Boolean(q.trialUsed),
+        remaining: q.remaining,
+        isPremium: q.isPremium,
+      });
+    } catch (err) {
+      console.warn('Error fetching content-ideas trial status:', err);
+    }
+  };
+
+  useEffect(() => {
+    refreshTrial();
+  }, []);
+
   // Active Modals & Card State
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
@@ -146,6 +171,7 @@ export const ContentIdeas: React.FC<ContentIdeasProps> = ({ onBackToChat, onNavi
 
       // Record quota consumption only on success
       await consumeFeatureUsage('content-ideas');
+      setTrialStatus({ used: true, remaining: 0, isPremium: false });
 
       try {
         await recordAiUsage('Content Ideas');
@@ -261,7 +287,7 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
             )}
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xl select-none">💡</span>
                 <h1 className="text-base sm:text-lg font-bold text-slate-900">
                   Content Ideas
@@ -269,6 +295,19 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
                 <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                   AI Creator Tools
                 </span>
+                {trialStatus.isPremium ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" /> Akses Unlimited (Premium)
+                  </span>
+                ) : trialStatus.used ? (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-rose-500" /> Trial Habis (Khusus Premium)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Kesempatan Gratis: 1x
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 Temukan ide konten yang relevan dan menarik dengan bantuan AI.
@@ -320,8 +359,14 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
                 <button
                   id="btn-generate-again-top"
                   type="button"
-                  onClick={handleGenerate}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 text-xs font-semibold text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-sm transition-colors"
+                  onClick={() => {
+                    if (!trialStatus.isPremium && trialStatus.used) {
+                      setShowQuotaModal(true);
+                      return;
+                    }
+                    handleGenerate();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 text-xs font-semibold text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
                   Generate Ulang Semua
@@ -785,12 +830,31 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
                   <button
                     id="btn-generate-ideas"
                     type="button"
-                    onClick={handleGenerate}
+                    onClick={() => {
+                      if (!trialStatus.isPremium && trialStatus.used) {
+                        setShowQuotaModal(true);
+                        return;
+                      }
+                      handleGenerate();
+                    }}
                     disabled={isLoading}
-                    className="w-full py-3.5 px-4 rounded-xl bg-slate-900 text-white text-sm sm:text-base font-bold flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.99] transition-all shadow-md shadow-slate-900/10 cursor-pointer disabled:opacity-50"
+                    className={`w-full py-3.5 px-4 rounded-xl text-white text-sm sm:text-base font-bold flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer ${
+                      !trialStatus.isPremium && trialStatus.used
+                        ? 'bg-slate-800 hover:bg-slate-900 border border-rose-500/30'
+                        : 'bg-slate-900 hover:bg-slate-800 active:scale-[0.99] shadow-slate-900/10'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>✨ Generate Ideas</span>
+                    {!trialStatus.isPremium && trialStatus.used ? (
+                      <>
+                        <Lock className="w-4 h-4 text-rose-400" />
+                        <span>Trial Habis • Buka Akses Premium</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>✨ Generate Ideas</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </>
@@ -964,9 +1028,10 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
         </div>
       )}
 
-      {/* Quota Exceeded Modal (Daily 5x Limit for FREE accounts) */}
+      {/* Quota Exceeded Modal (1x Lifetime Trial Limit for FREE accounts) */}
       <QuotaExceededModal
         isOpen={showQuotaModal}
+        featureKey="content-ideas"
         featureLabel="Content Ideas"
         onClose={() => setShowQuotaModal(false)}
         onUpgrade={() => {
