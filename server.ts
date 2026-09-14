@@ -9,7 +9,11 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// Explicitly serve /branding from public folder
+app.use("/branding", express.static(path.join(process.cwd(), "public", "branding")));
 
 // CORS headers for all incoming requests and preflight OPTIONS handling
 app.use((req, res, next) => {
@@ -723,8 +727,85 @@ let brandingCache: ServerBrandingData = {
   chatAiLogoUrl: null,
 };
 
+const BRANDING_CONFIG_PATH = path.join(process.cwd(), "data", "branding_config.json");
+
+function loadBrandingCache(): void {
+  try {
+    if (fs.existsSync(BRANDING_CONFIG_PATH)) {
+      const data = JSON.parse(fs.readFileSync(BRANDING_CONFIG_PATH, "utf-8"));
+      if (data && typeof data === "object") {
+        brandingCache = {
+          splashLogoUrl: data.splashLogoUrl || null,
+          headerLogoUrl: data.headerLogoUrl || null,
+          chatAiLogoUrl: data.chatAiLogoUrl || null,
+          updatedAt: data.updatedAt,
+          updatedBy: data.updatedBy,
+        };
+        console.log("[Server] Loaded branding configuration from disk.");
+      }
+    }
+  } catch (err) {
+    console.warn("[Server] Could not load branding config from disk:", err);
+  }
+}
+loadBrandingCache();
+
+function saveBrandingCache(): void {
+  try {
+    const dir = path.dirname(BRANDING_CONFIG_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(BRANDING_CONFIG_PATH, JSON.stringify(brandingCache, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Server] Could not save branding config to disk:", err);
+  }
+}
+
 app.get("/api/branding", (_req: Request, res: Response): void => {
   res.json({ success: true, data: brandingCache });
+});
+
+// Direct fast logo upload endpoint for Super Admin
+app.post("/api/branding/upload", (req: Request, res: Response): void => {
+  try {
+    const { logoBase64, logoType, adminEmail } = req.body || {};
+    if (!logoBase64 || typeof logoBase64 !== "string" || !logoType) {
+      res.status(400).json({ error: "Data logo tidak valid (logoBase64 dan logoType diperlukan)." });
+      return;
+    }
+
+    const publicDir = path.join(process.cwd(), "public", "branding", "logos");
+    if (!fs.existsSync(publicDir)) {
+      fs.mkdirSync(publicDir, { recursive: true });
+    }
+
+    const cleanBase64 = logoBase64.replace(/^data:image\/\w+;base64,/, "");
+    let ext = "png";
+    if (logoBase64.includes("image/jpeg") || logoBase64.includes("image/jpg")) ext = "jpg";
+    else if (logoBase64.includes("image/webp")) ext = "webp";
+
+    const timestamp = Date.now();
+    const fileName = `${logoType}_logo_${timestamp}.${ext}`;
+    const targetFile = path.join(publicDir, fileName);
+    fs.writeFileSync(targetFile, Buffer.from(cleanBase64, "base64"));
+
+    const staticUrl = `/branding/logos/${fileName}?v=${timestamp}`;
+
+    if (logoType === "splash") brandingCache.splashLogoUrl = staticUrl;
+    else if (logoType === "header") brandingCache.headerLogoUrl = staticUrl;
+    else if (logoType === "chat-ai") brandingCache.chatAiLogoUrl = staticUrl;
+
+    brandingCache.updatedAt = new Date().toISOString();
+    brandingCache.updatedBy = adminEmail || "super_admin";
+    saveBrandingCache();
+
+    console.log(`[Server] Saved new logo for ${logoType}: ${staticUrl}`);
+    res.json({ success: true, url: staticUrl, data: brandingCache });
+  } catch (err: any) {
+    console.error("[Server] Logo upload error:", err);
+    res.status(500).json({ error: err?.message || "Gagal menyimpan file logo." });
+  }
 });
 
 app.post("/api/branding", (req: Request, res: Response): void => {
@@ -759,6 +840,7 @@ app.post("/api/branding", (req: Request, res: Response): void => {
         updatedAt: new Date().toISOString(),
         updatedBy: adminEmail || "super_admin",
       };
+      saveBrandingCache();
       res.json({ success: true, data: brandingCache });
       return;
     }

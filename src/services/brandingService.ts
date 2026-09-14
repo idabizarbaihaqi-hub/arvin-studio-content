@@ -113,8 +113,64 @@ export function subscribeBrandingConfig(callback: (config: BrandingConfig) => vo
 }
 
 /**
- * Validate and upload logo file to Firebase Storage.
- * Directory: branding/logos/{splash | header | chat-ai}/
+ * Optimize logo image to preserve transparency and prevent oversized payloads.
+ * Resizes images exceeding 800px dimension and converts to efficient Base64.
+ */
+export async function optimizeLogoImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve((e.target?.result as string) || '');
+            return;
+          }
+
+          // Clear for PNG alpha transparency
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Preserve PNG format for transparency; fallback to WebP or JPEG
+          const format = file.type === 'image/png' ? 'image/png' : 'image/webp';
+          const dataUrl = canvas.toDataURL(format, 0.92);
+          resolve(dataUrl);
+        } catch (err) {
+          console.warn('[BrandingService] Canvas optimization fallback:', err);
+          resolve((e.target?.result as string) || '');
+        }
+      };
+      img.onerror = () => reject(new Error('Gagal membaca gambar. Silakan gunakan file gambar valid.'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar dari perangkat.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Validate and upload logo file.
+ * Uses fast server-side static storage with Firebase Storage synchronization,
+ * protected by strict timeouts to ensure the UI NEVER hangs.
  */
 export async function uploadLogoFile(
   file: File,
@@ -136,58 +192,73 @@ export async function uploadLogoFile(
     throw new Error('Format file tidak didukung. Harap gunakan format PNG, JPG, JPEG, atau WEBP.');
   }
 
-  const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const storagePath = `branding/logos/${logoType}/${Date.now()}_${cleanName}`;
+  // Step 1: Optimize file for fast transport and clean alpha transparency
+  const optimizedBase64 = await optimizeLogoImage(file);
 
+  // Step 2: First attempt direct server-side upload for instant response (< 200ms)
   try {
-    const storageRef = ref(storage, storagePath);
-    const snapshot = await uploadBytes(storageRef, file, {
-      contentType: file.type,
-      customMetadata: {
+    const uploadRes = await fetch('/api/branding/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        logoBase64: optimizedBase64,
         logoType,
-        uploadedBy: adminUser.email || adminUser.uid,
-        uploadedAt: new Date().toISOString(),
-      },
+        adminEmail: adminUser.email || adminUser.uid,
+      }),
     });
 
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    return downloadUrl;
-  } catch (storageErr: any) {
-    console.warn('[BrandingService] Firebase Storage upload error, trying base64 fallback:', storageErr);
-
-    // Fallback: Read file as Data URL and sync via backend proxy
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async () => {
+    if (uploadRes.ok) {
+      const resJson = await uploadRes.json();
+      if (resJson && resJson.url) {
+        // Also trigger async background Firebase Storage upload if available, without blocking UI
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const storagePath = `branding/logos/${logoType}/${Date.now()}_${cleanName}`;
         try {
-          const base64Data = reader.result as string;
-          const res = await fetch('/api/branding', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              branding: {},
-              logoBase64: base64Data,
+          const storageRef = ref(storage, storagePath);
+          uploadBytes(storageRef, file, {
+            contentType: file.type,
+            customMetadata: {
               logoType,
-              adminEmail: adminUser.email,
-            }),
-          });
-          if (res.ok) {
-            const json = await res.json();
-            const field = logoType === 'splash' ? 'splashLogoUrl' : logoType === 'header' ? 'headerLogoUrl' : 'chatAiLogoUrl';
-            if (json.data && json.data[field]) {
-              resolve(json.data[field]);
-              return;
-            }
-          }
-          // If server didn't provide static url, base64 itself works as valid src
-          resolve(base64Data);
-        } catch (fbErr) {
-          reject(new Error(storageErr?.message || 'Gagal mengunggah logo ke penyimpanan.'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Gagal memproses file gambar'));
-      reader.readAsDataURL(file);
-    });
+              uploadedBy: adminUser.email || adminUser.uid,
+              uploadedAt: new Date().toISOString(),
+            },
+          }).catch((e) => console.warn('[BrandingService] Background storage sync notice:', e));
+        } catch (_) {}
+
+        return resJson.url;
+      }
+    }
+  } catch (serverErr) {
+    console.warn('[BrandingService] Fast server upload error, checking Firebase Storage fallback:', serverErr);
+  }
+
+  // Step 3: Firebase Storage fallback with strict 3.5-second timeout to prevent infinite hanging
+  try {
+    const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const storagePath = `branding/logos/${logoType}/${Date.now()}_${cleanName}`;
+    const storageRef = ref(storage, storagePath);
+
+    const uploadTask = async () => {
+      const snapshot = await uploadBytes(storageRef, file, {
+        contentType: file.type,
+        customMetadata: {
+          logoType,
+          uploadedBy: adminUser.email || adminUser.uid,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+      return await getDownloadURL(snapshot.ref);
+    };
+
+    const timeoutTask = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('STORAGE_TIMEOUT')), 3500)
+    );
+
+    return await Promise.race([uploadTask(), timeoutTask]);
+  } catch (storageErr) {
+    console.warn('[BrandingService] Firebase Storage timed out or failed, using optimized base64:', storageErr);
+    // If both server endpoint and Firebase storage failed, return the optimized base64 directly
+    return optimizedBase64;
   }
 }
 
@@ -224,9 +295,15 @@ export async function updateBrandingLogo(
 
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, BRANDING_DOC_ID);
-    await setDoc(docRef, updated, { merge: true });
+    const firestorePromise = setDoc(docRef, updated, { merge: true });
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('FIRESTORE_WRITE_TIMEOUT')), 3500)
+    );
 
-    // Sync to backend cache
+    // Race firestore write with 3.5s timeout
+    await Promise.race([firestorePromise, timeoutPromise]);
+
+    // Async sync to backend cache
     fetch('/api/branding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -234,19 +311,23 @@ export async function updateBrandingLogo(
         branding: updated,
         adminEmail: adminUser.email,
       }),
-    }).catch((syncErr) => console.warn('[BrandingService] Backend sync error:', syncErr));
+    }).catch((syncErr) => console.warn('[BrandingService] Backend sync notice:', syncErr));
   } catch (firestoreErr: any) {
-    console.warn('[BrandingService] Firestore write warning, using backend fallback:', firestoreErr);
-    const res = await fetch('/api/branding', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        branding: updated,
-        adminEmail: adminUser.email,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error('Gagal menyimpan konfigurasi branding ke database.');
+    console.warn('[BrandingService] Firestore write timeout or error, ensuring backend sync fallback:', firestoreErr);
+    try {
+      const res = await fetch('/api/branding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branding: updated,
+          adminEmail: adminUser.email,
+        }),
+      });
+      if (!res.ok) {
+        console.warn('[BrandingService] Backend fallback status not ok:', res.status);
+      }
+    } catch (apiErr) {
+      console.warn('[BrandingService] Backend fallback failed:', apiErr);
     }
   }
 

@@ -40,6 +40,7 @@ export const BrandLogoManagement: React.FC<BrandLogoManagementProps> = ({ curren
 
   const [stagedLogo, setStagedLogo] = useState<StagedLogo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
   const [isResetting, setIsResetting] = useState<LogoType | null>(null);
   const [resetModalType, setResetModalType] = useState<LogoType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -105,29 +106,44 @@ export const BrandLogoManagement: React.FC<BrandLogoManagementProps> = ({ curren
     if (!stagedLogo || !currentUser) return;
 
     setIsUploading(true);
+    setUploadStatus('Mengoptimalkan & mengunggah gambar...');
     setErrorMessage(null);
+    setSuccessMessage(null);
+
+    // Global 15s watchdog timer to guarantee the UI NEVER hangs
+    const safetyTimeout = setTimeout(() => {
+      setIsUploading(false);
+      setUploadStatus('');
+      setErrorMessage('Proses penyimpanan membutuhkan waktu terlalu lama. Silakan coba unggah kembali dengan file gambar lain.');
+    }, 15000);
 
     try {
-      // 1. Upload file to Firebase Storage
+      // 1. Upload file with instant server & background storage synchronization
       const downloadUrl = await uploadLogoFile(stagedLogo.file, stagedLogo.logoType, currentUser);
 
-      // 2. Save active URL in Firestore app_settings/branding and record Audit Log
+      // 2. Save active URL in settings and record Audit Log
+      setUploadStatus('Menyimpan ke pengaturan aplikasi...');
       await updateBrandingLogo(stagedLogo.logoType, downloadUrl, currentUser);
 
-      // 3. Refresh context
+      // 3. Refresh context and active view
+      setUploadStatus('Memperbarui logo di sistem...');
       await refreshBranding();
 
+      clearTimeout(safetyTimeout);
       const label = LOGO_LABELS[stagedLogo.logoType];
-      setSuccessMessage(`Logo ${label} berhasil diperbarui dan aktif di seluruh aplikasi.`);
+      setSuccessMessage(`Logo ${label} berhasil disimpan dan langsung aktif di seluruh aplikasi.`);
 
       // Clean up staging
       URL.revokeObjectURL(stagedLogo.previewUrl);
       setStagedLogo(null);
     } catch (err: any) {
+      clearTimeout(safetyTimeout);
       console.error('[BrandLogoManagement] Upload failed:', err);
-      setErrorMessage(err?.message || 'Terjadi kesalahan saat menyimpan logo baru.');
+      setErrorMessage(err?.message || 'Terjadi kesalahan saat menyimpan logo baru. Silakan coba kembali.');
     } finally {
+      clearTimeout(safetyTimeout);
       setIsUploading(false);
+      setUploadStatus('');
     }
   };
 
@@ -138,16 +154,25 @@ export const BrandLogoManagement: React.FC<BrandLogoManagementProps> = ({ curren
     setResetModalType(null);
     setIsResetting(targetType);
     setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const safetyResetTimeout = setTimeout(() => {
+      setIsResetting(null);
+      setErrorMessage('Waktu reset logo habis. Silakan coba kembali.');
+    }, 10000);
 
     try {
       await resetBrandingLogo(targetType, currentUser);
       await refreshBranding();
+      clearTimeout(safetyResetTimeout);
       const label = LOGO_LABELS[targetType];
       setSuccessMessage(`Logo ${label} berhasil dikembalikan ke logo default ARVIN STUDIO.`);
     } catch (err: any) {
+      clearTimeout(safetyResetTimeout);
       console.error('[BrandLogoManagement] Reset failed:', err);
       setErrorMessage(err?.message || 'Gagal mengembalikan logo ke default.');
     } finally {
+      clearTimeout(safetyResetTimeout);
       setIsResetting(null);
     }
   };
@@ -194,6 +219,18 @@ export const BrandLogoManagement: React.FC<BrandLogoManagementProps> = ({ curren
       </div>
 
       {/* Alert Banners */}
+      {isUploading && (
+        <div
+          id="brand-logo-uploading-banner"
+          className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-sm flex items-center gap-3 animate-in fade-in"
+        >
+          <RefreshCw className="w-5 h-5 shrink-0 text-blue-600 animate-spin" />
+          <div className="flex-1 font-medium">
+            {uploadStatus || 'Sedang memproses dan menyimpan logo...'}
+          </div>
+        </div>
+      )}
+
       {errorMessage && (
         <div
           id="brand-logo-error-banner"
