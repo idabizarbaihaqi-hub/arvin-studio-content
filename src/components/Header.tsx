@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, MoreVertical } from 'lucide-react';
 import { AsLogo } from './AsLogo';
+import { AppLogo } from './AppLogo';
 import { ActiveView } from '../types';
 
 interface HeaderProps {
@@ -36,7 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
-          <AsLogo size={24} />
+          <AppLogo type="header" size={24} className="shrink-0" />
           <h2 className="font-bold tracking-tight text-slate-800 text-sm sm:text-lg">
             ARVIN STUDIO
           </h2>

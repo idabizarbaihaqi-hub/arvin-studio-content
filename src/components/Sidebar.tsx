@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, MessageSquare, ChevronRight } from 'lucide-react';
 import { AsLogo } from './AsLogo';
+import { AppLogo } from './AppLogo';
 import { MenuGroup, MenuItem, ActiveView } from '../types';
 
 interface SidebarProps {
@@ -93,8 +94,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-md shadow-slate-300 shrink-0">
-              <AsLogo size={22} variant="light" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-md shadow-slate-300 shrink-0 overflow-hidden p-1.5">
+              <AppLogo type="header" size={24} variant="light" className="w-full h-full" />
             </div>
             <div className="flex flex-col">
               <span className="font-bold tracking-tight text-slate-900 text-base leading-tight">

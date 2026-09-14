@@ -15,9 +15,11 @@ import {
   Sparkles,
   Landmark,
   Award,
+  Palette,
 } from 'lucide-react';
 import { AdminViewKey, UserProfile } from '../../types';
 import { AsLogo } from '../AsLogo';
+import { AppLogo } from '../AppLogo';
 
 interface AdminSidebarProps {
   isOpen: boolean;
@@ -71,6 +73,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     {
       group: 'SYSTEM',
       items: [
+        { key: 'brand-logo' as AdminViewKey, label: 'Brand & Logo', icon: Palette },
         { key: 'founder-profile' as AdminViewKey, label: 'Founder Profile', icon: Award },
         { key: 'system-settings' as AdminViewKey, label: 'System Settings', icon: Settings },
         { key: 'admin-profile' as AdminViewKey, label: 'Admin Profile', icon: ShieldCheck },
@@ -99,8 +102,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         {/* Brand Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
-              <AsLogo className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs overflow-hidden p-1.5">
+              <AppLogo type="header" size={24} variant="light" className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">

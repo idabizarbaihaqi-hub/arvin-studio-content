@@ -40,6 +40,7 @@ import { LoginView } from './components/LoginView';
 import { RegisterView } from './components/RegisterView';
 import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { AsLogo } from './components/AsLogo';
+import { AppLogo } from './components/AppLogo';
 import { FeaturePlaceholderModal } from './components/FeaturePlaceholderModal';
 import { OptionsMenuModal } from './components/OptionsMenuModal';
 import { AdminPanel } from './components/admin/AdminPanel';
@@ -360,8 +361,8 @@ export default function App() {
   if (authChecking) {
     return (
       <div id="auth-loading-screen" className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-slate-500">
-        <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md mb-4">
-          <AsLogo className="w-8 h-8" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md mb-4 overflow-hidden p-2">
+          <AppLogo type="splash" size={36} variant="light" className="w-8 h-8" />
         </div>
         <RefreshCw className="w-5 h-5 animate-spin text-slate-600 mb-2" />
         <p className="text-xs font-semibold text-slate-600">Menghubungkan ke ARVIN STUDIO...</p>

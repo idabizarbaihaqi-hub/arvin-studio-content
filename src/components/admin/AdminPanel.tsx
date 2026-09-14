@@ -23,6 +23,7 @@ import { AdminProfile } from './AdminProfile';
 import { SystemSettings } from './SystemSettings';
 import { PaymentAccountManagement } from './PaymentAccountManagement';
 import { FounderManagement } from './FounderManagement';
+import { BrandLogoManagement } from './BrandLogoManagement';
 
 interface AdminPanelProps {
   currentUser: UserProfile | null;
@@ -209,6 +210,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {currentView === 'founder-profile' && (
             <FounderManagement currentUser={currentUser} />
+          )}
+
+          {currentView === 'brand-logo' && (
+            <BrandLogoManagement currentUser={currentUser} />
           )}
 
           {currentView === 'admin-profile' && (

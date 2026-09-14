@@ -719,8 +719,19 @@ export type AdminViewKey =
   | 'content-history'
   | 'activity-logs'
   | 'founder-profile'
+  | 'brand-logo'
   | 'system-settings'
   | 'admin-profile';
+
+export type LogoType = 'splash' | 'header' | 'chat-ai';
+
+export interface BrandingConfig {
+  splashLogoUrl?: string | null;
+  headerLogoUrl?: string | null;
+  chatAiLogoUrl?: string | null;
+  updatedAt?: string;
+  updatedBy?: string;
+}
 
 export interface FounderProfile {
   name: string;

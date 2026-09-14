@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ImagePlus, Sparkles, UploadCloud, Eye } from 'lucide-react';
 import { AsLogo } from './AsLogo';
+import { AppLogo } from './AppLogo';
 import { ChatImageAttachment } from '../types';
 
 interface EmptyStateProps {
@@ -84,9 +85,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       className="flex-1 flex flex-col items-center justify-center min-h-[55vh] sm:min-h-[60vh] p-4 sm:p-8 text-center select-none"
     >
       <div className="max-w-xl w-full flex flex-col items-center text-center">
-        {/* Monogram Icon Container */}
-        <div className="w-18 h-18 sm:w-22 sm:h-22 bg-white rounded-3xl shadow-xl shadow-slate-200/80 flex items-center justify-center mb-6 sm:mb-8 border border-slate-100">
-          <AsLogo size={42} />
+        {/* Chat AI Brand Icon Container */}
+        <div className="w-18 h-18 sm:w-22 sm:h-22 bg-white rounded-3xl shadow-xl shadow-slate-200/80 flex items-center justify-center mb-6 sm:mb-8 border border-slate-100 overflow-hidden p-3">
+          <AppLogo type="chat-ai" size={46} className="w-full h-full" />
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2 tracking-tight">

@@ -40,5 +40,19 @@ service firebase.storage {
         request.auth.token.role == 'SUPER_ADMIN'
       );
     }
+
+    match /branding/logos/{allPaths=**} {
+      // Official branding logos are publicly readable for seamless app display
+      allow read: if true;
+      // Only Super Admins can upload, modify, or delete official logos
+      allow write: if request.auth != null && (
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
+        )) ||
+        request.auth.token.superAdmin == true ||
+        request.auth.token.role == 'SUPER_ADMIN'
+      );
+    }
   }
 }

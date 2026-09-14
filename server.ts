@@ -708,6 +708,66 @@ app.post("/api/founder-profile", (req: Request, res: Response): void => {
   }
 });
 
+// Branding & Logo Management Server Endpoints
+interface ServerBrandingData {
+  splashLogoUrl: string | null;
+  headerLogoUrl: string | null;
+  chatAiLogoUrl: string | null;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+let brandingCache: ServerBrandingData = {
+  splashLogoUrl: null,
+  headerLogoUrl: null,
+  chatAiLogoUrl: null,
+};
+
+app.get("/api/branding", (_req: Request, res: Response): void => {
+  res.json({ success: true, data: brandingCache });
+});
+
+app.post("/api/branding", (req: Request, res: Response): void => {
+  try {
+    const { branding, adminEmail, logoBase64, logoType } = req.body || {};
+    if (branding && typeof branding === "object") {
+      let updatedConfig = { ...brandingCache, ...branding };
+
+      // Fallback base64 file persistence to public folder if provided
+      if (logoBase64 && typeof logoBase64 === "string" && logoType) {
+        try {
+          const publicDir = path.join(process.cwd(), "public", "branding", "logos");
+          if (!fs.existsSync(publicDir)) {
+            fs.mkdirSync(publicDir, { recursive: true });
+          }
+          const base64Data = logoBase64.replace(/^data:image\/\w+;base64,/, "");
+          const ext = logoBase64.includes("png") ? "png" : "webp";
+          const fileName = `${logoType}_logo.${ext}`;
+          const targetFile = path.join(publicDir, fileName);
+          fs.writeFileSync(targetFile, Buffer.from(base64Data, "base64"));
+          const staticUrl = `/branding/logos/${fileName}?v=${Date.now()}`;
+          if (logoType === "splash") updatedConfig.splashLogoUrl = staticUrl;
+          if (logoType === "header") updatedConfig.headerLogoUrl = staticUrl;
+          if (logoType === "chat-ai") updatedConfig.chatAiLogoUrl = staticUrl;
+        } catch (fileErr) {
+          console.warn("[Server] Failed to write logo file to public dir:", fileErr);
+        }
+      }
+
+      brandingCache = {
+        ...updatedConfig,
+        updatedAt: new Date().toISOString(),
+        updatedBy: adminEmail || "super_admin",
+      };
+      res.json({ success: true, data: brandingCache });
+      return;
+    }
+    res.status(400).json({ error: "Invalid branding payload" });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Internal server error" });
+  }
+});
+
 // Admin endpoints for Gemini API Key configuration
 app.get("/api/admin/gemini-config", (_req: Request, res: Response): void => {
   const activeKey =

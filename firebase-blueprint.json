@@ -194,6 +194,19 @@
         "updatedBy": { "type": "string", "description": "Email atau UID super admin pengubah" }
       },
       "required": ["name", "title", "bio", "quote"]
+    },
+    "BrandingConfig": {
+      "title": "BrandingConfig",
+      "description": "Konfigurasi terpusat logo dan identitas merek ARVIN STUDIO di collection app_settings dokumen branding",
+      "type": "object",
+      "properties": {
+        "splashLogoUrl": { "type": "string", "description": "URL logo splash screen dan loading aplikasi" },
+        "headerLogoUrl": { "type": "string", "description": "URL logo header utama dan navigasi" },
+        "chatAiLogoUrl": { "type": "string", "description": "URL logo welcome screen dan empty state Chat AI" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" },
+        "updatedBy": { "type": "string", "description": "Email super admin pengubah" }
+      },
+      "required": []
     }
   },
   "firestore": {
