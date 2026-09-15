@@ -142,6 +142,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   // Secondary suite of AI Creator tools preserved for 100% functionality
   const secondaryTools = [
     {
+      id: 'edit-video',
+      title: 'Edit Video',
+      desc: 'Studio pemotong, rasio 9:16, teks, filter, dan ekspor video.',
+      badge: '🔒 Premium',
+      icon: Film,
+      view: 'edit-video' as ActiveView,
+    },
+    {
       id: 'script-maker',
       title: 'Script Maker',
       desc: 'Naskah video terstruktur untuk TikTok, Reels, dan Shorts.',

@@ -1267,3 +1267,117 @@ export async function getAccountSummary(): Promise<AccountSummary> {
     isPremium: premium,
   };
 }
+
+// ----------------------------------------------------
+// VERIFIKASI AKSES EDIT VIDEO (TAHAP 1 - PREMIUM ONLY)
+// ----------------------------------------------------
+
+export interface VideoEditorAccessResult {
+  allowed: boolean;
+  isSuperAdmin: boolean;
+  isPremium: boolean;
+  reason: 'SUPER_ADMIN' | 'PREMIUM' | 'FREE_LOCKED' | 'NOT_AUTHENTICATED';
+  userEmail?: string | null;
+}
+
+/**
+ * Memverifikasi hak akses fitur Edit Video secara komprehensif.
+ * ATURAN MUTLAK ARVIN STUDIO:
+ * - Free User: 0 penggunaan, tidak ada trial, tidak memakan quota AI, terkunci (FREE_LOCKED).
+ * - Premium User: Akses penuh selama status langganan ACTIVE dan belum kadaluarsa.
+ * - Super Admin: Akses penuh (id.agnesyakartika@gmail.com / role SUPER_ADMIN) untuk testing & administrasi.
+ */
+export async function verifyVideoEditorAccess(
+  cachedProfile?: UserProfile | null
+): Promise<VideoEditorAccessResult> {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) {
+    return {
+      allowed: false,
+      isSuperAdmin: false,
+      isPremium: false,
+      reason: 'NOT_AUTHENTICATED',
+      userEmail: null,
+    };
+  }
+
+  const email = firebaseUser.email || cachedProfile?.email || null;
+
+  // 1. Verifikasi Super Admin (Prioritas Tertinggi)
+  if (isSuperAdminEmail(email)) {
+    return {
+      allowed: true,
+      isSuperAdmin: true,
+      isPremium: true,
+      reason: 'SUPER_ADMIN',
+      userEmail: email,
+    };
+  }
+
+  // 2. Dapatkan profil pengguna terkini dari Firestore
+  let profile = cachedProfile;
+  try {
+    if (!profile || profile.id !== firebaseUser.uid) {
+      profile = await getUserProfile(firebaseUser.uid);
+    }
+  } catch (err) {
+    console.warn('[VideoEditorAccess] Gagal memuat profil terbaru:', err);
+  }
+
+  if (profile && isSuperAdminUser(profile)) {
+    return {
+      allowed: true,
+      isSuperAdmin: true,
+      isPremium: true,
+      reason: 'SUPER_ADMIN',
+      userEmail: email,
+    };
+  }
+
+  // 3. Verifikasi Status Langganan Premium Aktif di Firestore
+  if (profile && profile.plan === 'PREMIUM' && profile.subscriptionStatus === 'ACTIVE') {
+    if (profile.subscriptionExpiry) {
+      const isNotExpired = new Date().getTime() <= new Date(profile.subscriptionExpiry).getTime();
+      if (isNotExpired) {
+        return {
+          allowed: true,
+          isSuperAdmin: false,
+          isPremium: true,
+          reason: 'PREMIUM',
+          userEmail: email,
+        };
+      }
+    } else {
+      // Paket Premium aktif tanpa tanggal expiry
+      return {
+        allowed: true,
+        isSuperAdmin: false,
+        isPremium: true,
+        reason: 'PREMIUM',
+        userEmail: email,
+      };
+    }
+  }
+
+  // 4. Double check via isPremium()
+  const premiumActive = await isPremium();
+  if (premiumActive) {
+    return {
+      allowed: true,
+      isSuperAdmin: false,
+      isPremium: true,
+      reason: 'PREMIUM',
+      userEmail: email,
+    };
+  }
+
+  // 5. Akun FREE -> Terkunci Total (Tidak ada trial)
+  return {
+    allowed: false,
+    isSuperAdmin: false,
+    isPremium: false,
+    reason: 'FREE_LOCKED',
+    userEmail: email,
+  };
+}
+

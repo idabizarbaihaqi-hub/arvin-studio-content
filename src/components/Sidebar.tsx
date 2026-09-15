@@ -11,6 +11,7 @@ interface SidebarProps {
   onSelectView: (view: ActiveView) => void;
   onSelectFeaturePlaceholder: (item: MenuItem) => void;
   isSuperAdmin?: boolean;
+  isPremium?: boolean;
   onNavigateToAdmin?: () => void;
   userName?: string;
   userPhotoURL?: string | null;
@@ -41,8 +42,9 @@ export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
       { id: 'content-ideas', label: 'Content Ideas', iconName: '💡', badge: 'Kreatif' },
       { id: 'caption-maker', label: 'Caption Maker', iconName: '✍️', badge: 'Viral' },
       { id: 'hook-generator', label: 'Hook Generator', iconName: '🔥', badge: 'Retensi' },
-      { id: 'script-maker', label: 'Script Maker', iconName: '🎬', badge: 'Naskah' },
+      { id: 'script-maker', label: 'Script Maker', iconName: '📜', badge: 'Naskah' },
       { id: 'hashtag-generator', label: 'Hashtag Generator', iconName: '#️⃣', badge: 'Tagar' },
+      { id: 'edit-video', label: 'Edit Video', iconName: '🎬', badge: '🔒 Premium' },
     ],
   },
   {
@@ -73,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectView,
   onSelectFeaturePlaceholder,
   isSuperAdmin,
+  isPremium,
   onNavigateToAdmin,
   userName,
   userPhotoURL,
@@ -145,9 +148,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const isHistory = item.id === 'history';
                   const isAccount = item.id === 'account';
                   const isProfile = item.id === 'profile';
-                  const isPremium = item.id === 'premium';
+                  const isPremiumView = item.id === 'premium';
                   const isCredits = item.id === 'credits';
                   const isSettings = item.id === 'settings';
+                  const isEditVideo = item.id === 'edit-video';
 
                   const isActive =
                     (isHome && activeView === 'home') ||
@@ -158,14 +162,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     (isHookGenerator && activeView === 'hook-generator') ||
                     (isScriptMaker && activeView === 'script-maker') ||
                     (isHashtagGenerator && activeView === 'hashtag-generator') ||
+                    (isEditVideo && activeView === 'edit-video') ||
                     (isContentPlanner && activeView === 'content-planner') ||
                     (isAnalytics && activeView === 'analytics') ||
                     (isHistory && activeView === 'history') ||
                     (isAccount && activeView === 'account') ||
                     (isProfile && activeView === 'profile') ||
-                    (isPremium && activeView === 'premium') ||
+                    (isPremiumView && activeView === 'premium') ||
                     (isCredits && activeView === 'credits') ||
                     (isSettings && activeView === 'settings');
+
+                  // Dynamic badge for Edit Video depending on user privileges
+                  let displayBadge = item.badge;
+                  let badgeStyle = 'bg-blue-50 text-blue-700 border border-blue-100';
+
+                  if (isEditVideo) {
+                    if (isSuperAdmin) {
+                      displayBadge = 'Admin';
+                      badgeStyle = 'bg-amber-50 text-amber-800 border border-amber-200';
+                    } else if (isPremium) {
+                      displayBadge = 'PRO';
+                      badgeStyle = 'bg-emerald-50 text-emerald-800 border border-emerald-200';
+                    } else {
+                      displayBadge = '🔒 Premium';
+                      badgeStyle = 'bg-amber-50 text-amber-800 border border-amber-200';
+                    }
+                  }
 
                   return (
                     <button
@@ -197,6 +219,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         } else if (isHashtagGenerator) {
                           onSelectView('hashtag-generator');
                           onClose();
+                        } else if (isEditVideo) {
+                          onSelectView('edit-video');
+                          onClose();
                         } else if (isContentPlanner) {
                           onSelectView('content-planner');
                           onClose();
@@ -212,7 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         } else if (isProfile) {
                           onSelectView('profile');
                           onClose();
-                        } else if (isPremium) {
+                        } else if (isPremiumView) {
                           onSelectView('premium');
                           onClose();
                         } else if (isCredits) {
@@ -238,15 +263,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="truncate">{item.label}</span>
                       </div>
 
-                      {item.badge ? (
+                      {displayBadge ? (
                         <span
                           className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                             isActive
                               ? 'bg-white/20 text-white'
-                              : 'bg-blue-50 text-blue-700 border border-blue-100'
+                              : badgeStyle
                           }`}
                         >
-                          {item.badge}
+                          {displayBadge}
                         </span>
                       ) : (
                         <ChevronRight

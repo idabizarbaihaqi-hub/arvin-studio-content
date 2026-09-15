@@ -27,6 +27,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     'hashtag-generator',
     'content-planner',
     'analytics',
+    'edit-video',
   ].includes(activeView);
   const isCreateActive = activeView === 'chat';
   const isPremiumActive = activeView === 'premium' || activeView === 'credits';

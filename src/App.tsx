@@ -48,6 +48,7 @@ import { AppLogo } from './components/AppLogo';
 import { FeaturePlaceholderModal } from './components/FeaturePlaceholderModal';
 import { OptionsMenuModal } from './components/OptionsMenuModal';
 import { AdminPanel } from './components/admin/AdminPanel';
+import { EditVideoContainer } from './components/video/EditVideoContainer';
 import { SuperAdminGuard } from './components/admin/SuperAdminGuard';
 
 export default function App() {
@@ -59,7 +60,13 @@ export default function App() {
       ? 'admin'
       : 'dashboard';
   });
-  const [activeView, setActiveView] = useState<ActiveView>('home');
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/edit-video') return 'edit-video';
+    }
+    return 'home';
+  });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -120,10 +127,14 @@ export default function App() {
   // Sync route with browser history (popstate)
   useEffect(() => {
     const handlePopState = () => {
-      if (window.location.pathname.startsWith('/admin')) {
+      const path = window.location.pathname;
+      if (path.startsWith('/admin')) {
         setAppRoute('admin');
       } else {
         setAppRoute('dashboard');
+        if (path === '/edit-video') {
+          setActiveView('edit-video');
+        }
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -551,6 +562,11 @@ export default function App() {
           onBackToChat={() => setActiveView('chat')}
           onNavigateToTool={(toolId) => setActiveView(toolId as ActiveView)}
         />
+      ) : activeView === 'edit-video' ? (
+        <EditVideoContainer
+          currentUser={currentUser}
+          onNavigate={setActiveView}
+        />
       ) : activeView === 'home' ? (
         /* ---------------- Home Studio Dashboard (No Chat Footer!) ---------------- */
         <main
@@ -702,6 +718,7 @@ export default function App() {
           setPlaceholderItem(item);
         }}
         isSuperAdmin={currentUser?.role === 'SUPER_ADMIN'}
+        isPremium={currentUser?.plan === 'PREMIUM' && currentUser?.subscriptionStatus === 'ACTIVE'}
         userName={currentUser?.fullName}
         userPhotoURL={currentUser?.photoURL}
         onNavigateToAdmin={() => {

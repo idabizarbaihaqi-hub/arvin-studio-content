@@ -49,7 +49,8 @@ export type SidebarMenuItemId =
   | 'premium'
   | 'credits'
   | 'profile'
-  | 'settings';
+  | 'settings'
+  | 'edit-video';
 
 export interface MenuItem {
   id: SidebarMenuItemId;
@@ -181,7 +182,8 @@ export type ActiveView =
   | 'about'
   | 'login'
   | 'register'
-  | 'forgot-password';
+  | 'forgot-password'
+  | 'edit-video';
 
 export type CaptionPlatform =
   | 'Instagram'
