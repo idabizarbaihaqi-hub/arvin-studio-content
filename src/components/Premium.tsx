@@ -24,7 +24,7 @@ import {
   validatePaymentProofFile,
 } from '../services/accessControlService';
 import { getActivePaymentAccounts } from '../services/paymentAccountService';
-import { getActivePremiumPlans } from '../services/premiumPlanService';
+import { getActivePremiumPlans, DEFAULT_PREMIUM_PLANS } from '../services/premiumPlanService';
 
 interface PremiumProps {
   onBack: () => void;
@@ -41,13 +41,24 @@ export interface PackagePlan {
   benefits: string[];
 }
 
+const DEFAULT_MAPPED_PLANS: PackagePlan[] = DEFAULT_PREMIUM_PLANS.map((p) => ({
+  id: p.id,
+  name: p.name,
+  price: p.price,
+  duration: `${p.duration} ${p.durationUnit}`,
+  popular: Boolean(p.isPopular),
+  badge: p.badge,
+  description: p.description,
+  benefits: Array.isArray(p.benefits) ? p.benefits : [],
+}));
+
 export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Dynamic Premium Plans from Firestore
-  const [availablePlans, setAvailablePlans] = useState<PackagePlan[]>([]);
+  // Dynamic Premium Plans with immediate fallback
+  const [availablePlans, setAvailablePlans] = useState<PackagePlan[]>(DEFAULT_MAPPED_PLANS);
 
   // Dynamic Payment Accounts (Tahap 8C)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
@@ -93,7 +104,9 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
         description: p.description,
         benefits: Array.isArray(p.benefits) ? p.benefits : [],
       }));
-      setAvailablePlans(mappedPlans);
+      if (mappedPlans.length > 0) {
+        setAvailablePlans(mappedPlans);
+      }
     } catch (err) {
       console.error('Failed to load subscription, plans, or payment account data:', err);
     } finally {

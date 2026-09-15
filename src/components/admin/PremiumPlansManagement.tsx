@@ -30,6 +30,7 @@ import {
   deletePremiumPlan,
   isPremiumPlansAdmin,
   DESIGNATED_SUPER_ADMIN_EMAIL,
+  DEFAULT_PREMIUM_PLANS,
 } from '../../services/premiumPlanService';
 
 interface PremiumPlansManagementProps {
@@ -37,7 +38,7 @@ interface PremiumPlansManagementProps {
 }
 
 export const PremiumPlansManagement: React.FC<PremiumPlansManagementProps> = ({ currentUser }) => {
-  const [plans, setPlans] = useState<PremiumPlan[]>([]);
+  const [plans, setPlans] = useState<PremiumPlan[]>(DEFAULT_PREMIUM_PLANS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 

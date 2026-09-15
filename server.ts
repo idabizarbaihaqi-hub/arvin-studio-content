@@ -52,7 +52,7 @@ app.use((req, _res, next) => {
       "/chat", "/analyze", "/ideas", "/captions", "/hooks", "/scripts",
       "/hashtags", "/content-plans", "/ai-usage", "/history", "/analytics",
       "/account", "/subscription", "/credits", "/usage-limit", "/auth", "/health", "/admin",
-      "/founder-profile"
+      "/founder-profile", "/branding", "/premium-plans"
     ];
     if (apiRoutes.some((r) => original.startsWith(r))) {
       req.url = "/api" + req.url;
@@ -847,6 +847,274 @@ app.post("/api/branding", (req: Request, res: Response): void => {
     res.status(400).json({ error: "Invalid branding payload" });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Internal server error" });
+  }
+});
+
+// Premium Plans Management Server Endpoints
+interface ServerPremiumPlan {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+  durationUnit: "Hari" | "Bulan" | "Tahun";
+  description?: string;
+  badge?: string;
+  benefits: string[];
+  popular?: boolean;
+  isPopular?: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+const DEFAULT_SERVER_PREMIUM_PLANS: ServerPremiumPlan[] = [
+  {
+    id: "plan_7_days",
+    name: "PREMIUM 7 HARI",
+    price: 50000,
+    duration: 7,
+    durationUnit: "Hari",
+    description: "Akses penuh mingguan untuk akselerasi konten kreator pemula.",
+    badge: "Starter",
+    benefits: [
+      "Akses tanpa batas seluruh AI Creator Tools",
+      "Chat AI tanpa limit 5x/hari",
+      "Content Analyzer & Content Ideas unlimited",
+      "Caption Maker, Hook & Script Maker unlimited",
+      "Hashtag Generator unlimited",
+      "Content Planner & Kalender Terjadwal",
+      "Analytics & Pelacakan AI Usage",
+      "Bebas Iklan & Premium Badge Kreator",
+    ],
+    isPopular: false,
+    isActive: true,
+    sortOrder: 1,
+    isDeleted: false,
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+    createdBy: "SYSTEM",
+    updatedBy: "SYSTEM",
+  },
+  {
+    id: "plan_30_days",
+    name: "PREMIUM 30 HARI",
+    price: 150000,
+    duration: 30,
+    durationUnit: "Hari",
+    popular: true,
+    isPopular: true,
+    description: "Pilihan paling populer bagi kreator aktif yang konsisten posting.",
+    badge: "Best Value",
+    benefits: [
+      "Semua keuntungan paket 7 hari",
+      "Akses 30 hari penuh tanpa batas",
+      "Hemat 40% dibandingkan mingguan",
+      "Prioritas pemrosesan server berkecepatan tinggi",
+      "Ekspor riwayat dan jadwal konten tanpa batas",
+      "Dukungan prioritas kreator ARVIN",
+    ],
+    sortOrder: 2,
+    isActive: true,
+    isDeleted: false,
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+    createdBy: "SYSTEM",
+    updatedBy: "SYSTEM",
+  },
+  {
+    id: "plan_12_months",
+    name: "PREMIUM 12 BULAN",
+    price: 180000,
+    duration: 12,
+    durationUnit: "Bulan",
+    description: "Investasi terbaik setahun penuh untuk kreator profesional dan bisnis.",
+    badge: "Pro Annual",
+    benefits: [
+      "Semua fitur dan alat premium tanpa batas",
+      "Akses penuh 365 hari untuk kreator profesional",
+      "Hemat maksimal hingga 60%",
+      "Akses awal ke fitur baru mendatang",
+      "Konsultasi optimasi alur kerja konten",
+    ],
+    isPopular: false,
+    isActive: true,
+    sortOrder: 3,
+    isDeleted: false,
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+    createdBy: "SYSTEM",
+    updatedBy: "SYSTEM",
+  },
+];
+
+const PREMIUM_PLANS_FILE_PATH = path.join(dataDir, "premium_plans.json");
+let premiumPlansCache: ServerPremiumPlan[] = [...DEFAULT_SERVER_PREMIUM_PLANS];
+
+function loadPremiumPlansCache(): void {
+  try {
+    const candidatePaths = [
+      PREMIUM_PLANS_FILE_PATH,
+      path.join(process.cwd(), "data", "premium_plans.json"),
+      path.join("/tmp", "arvin_data", "premium_plans.json"),
+    ];
+    for (const filePath of candidatePaths) {
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          premiumPlansCache = parsed;
+          console.log(`[Server] Loaded ${parsed.length} premium plans from ${filePath}`);
+          return;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[Server] Could not load premium plans from disk, using default plans:", err);
+  }
+}
+loadPremiumPlansCache();
+
+function savePremiumPlansCache(): void {
+  try {
+    const dir = path.dirname(PREMIUM_PLANS_FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(PREMIUM_PLANS_FILE_PATH, JSON.stringify(premiumPlansCache, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[Server] Could not save premium plans to disk:", err);
+  }
+}
+
+app.get("/api/premium-plans", (req: Request, res: Response): void => {
+  const activeOnly = req.query.activeOnly === "true" || req.query.active === "true";
+  let result = [...premiumPlansCache].filter((p) => !p.isDeleted);
+  if (activeOnly) {
+    result = result.filter((p) => p.isActive);
+  }
+  result.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  res.json({ success: true, data: result });
+});
+
+app.post("/api/premium-plans", (req: Request, res: Response): void => {
+  try {
+    const body = req.body || {};
+    const now = new Date().toISOString();
+    const newId = body.id || `plan_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newPlan: ServerPremiumPlan = {
+      id: newId,
+      name: (body.name || "").trim(),
+      price: Math.max(0, Math.round(Number(body.price) || 0)),
+      duration: Math.max(1, Math.round(Number(body.duration) || 1)),
+      durationUnit: ["Hari", "Bulan", "Tahun"].includes(body.durationUnit) ? body.durationUnit : "Hari",
+      description: (body.description || "").trim(),
+      badge: (body.badge || "").trim(),
+      benefits: Array.isArray(body.benefits) ? body.benefits.filter(Boolean) : [],
+      popular: Boolean(body.isPopular ?? body.popular),
+      isPopular: Boolean(body.isPopular ?? body.popular),
+      isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+      sortOrder: Number(body.sortOrder) || premiumPlansCache.length + 1,
+      isDeleted: false,
+      createdAt: body.createdAt || now,
+      updatedAt: now,
+      createdBy: body.createdBy || "SUPER_ADMIN",
+      updatedBy: body.updatedBy || "SUPER_ADMIN",
+    };
+
+    const existingIndex = premiumPlansCache.findIndex((p) => p.id === newPlan.id);
+    if (existingIndex >= 0) {
+      premiumPlansCache[existingIndex] = newPlan;
+    } else {
+      premiumPlansCache.push(newPlan);
+    }
+    savePremiumPlansCache();
+    res.json({ success: true, data: newPlan });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to save premium plan" });
+  }
+});
+
+app.put("/api/premium-plans/:id", (req: Request, res: Response): void => {
+  try {
+    const planId = req.params.id;
+    const body = req.body || {};
+    const now = new Date().toISOString();
+    const index = premiumPlansCache.findIndex((p) => p.id === planId);
+
+    if (index === -1) {
+      const newPlan: ServerPremiumPlan = {
+        id: planId,
+        name: (body.name || "").trim(),
+        price: Math.max(0, Math.round(Number(body.price) || 0)),
+        duration: Math.max(1, Math.round(Number(body.duration) || 1)),
+        durationUnit: ["Hari", "Bulan", "Tahun"].includes(body.durationUnit) ? body.durationUnit : "Hari",
+        description: (body.description || "").trim(),
+        badge: (body.badge || "").trim(),
+        benefits: Array.isArray(body.benefits) ? body.benefits.filter(Boolean) : [],
+        popular: Boolean(body.isPopular ?? body.popular),
+        isPopular: Boolean(body.isPopular ?? body.popular),
+        isActive: body.isActive !== undefined ? Boolean(body.isActive) : true,
+        sortOrder: Number(body.sortOrder) || 1,
+        isDeleted: false,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: body.createdBy || "SUPER_ADMIN",
+        updatedBy: body.updatedBy || "SUPER_ADMIN",
+      };
+      premiumPlansCache.push(newPlan);
+      savePremiumPlansCache();
+      res.json({ success: true, data: newPlan });
+      return;
+    }
+
+    const current = premiumPlansCache[index];
+    const updatedPlan: ServerPremiumPlan = {
+      ...current,
+      ...body,
+      id: planId,
+      name: body.name !== undefined ? String(body.name).trim() : current.name,
+      price: body.price !== undefined ? Math.max(0, Math.round(Number(body.price) || 0)) : current.price,
+      duration: body.duration !== undefined ? Math.max(1, Math.round(Number(body.duration) || 1)) : current.duration,
+      durationUnit: body.durationUnit && ["Hari", "Bulan", "Tahun"].includes(body.durationUnit) ? body.durationUnit : current.durationUnit,
+      description: body.description !== undefined ? String(body.description).trim() : current.description,
+      badge: body.badge !== undefined ? String(body.badge).trim() : current.badge,
+      benefits: Array.isArray(body.benefits) ? body.benefits.filter(Boolean) : current.benefits,
+      popular: body.isPopular !== undefined ? Boolean(body.isPopular) : (body.popular !== undefined ? Boolean(body.popular) : current.isPopular),
+      isPopular: body.isPopular !== undefined ? Boolean(body.isPopular) : (body.popular !== undefined ? Boolean(body.popular) : current.isPopular),
+      isActive: body.isActive !== undefined ? Boolean(body.isActive) : current.isActive,
+      sortOrder: body.sortOrder !== undefined ? Number(body.sortOrder) || 1 : current.sortOrder,
+      isDeleted: body.isDeleted !== undefined ? Boolean(body.isDeleted) : current.isDeleted,
+      updatedAt: now,
+      updatedBy: body.updatedBy || current.updatedBy,
+    };
+
+    premiumPlansCache[index] = updatedPlan;
+    savePremiumPlansCache();
+    res.json({ success: true, data: updatedPlan });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to update premium plan" });
+  }
+});
+
+app.delete("/api/premium-plans/:id", (req: Request, res: Response): void => {
+  try {
+    const planId = req.params.id;
+    const index = premiumPlansCache.findIndex((p) => p.id === planId);
+    if (index !== -1) {
+      premiumPlansCache[index].isDeleted = true;
+      premiumPlansCache[index].isActive = false;
+      premiumPlansCache[index].updatedAt = new Date().toISOString();
+      savePremiumPlansCache();
+      res.json({ success: true, message: `Paket ${planId} berhasil dihapus.` });
+      return;
+    }
+    res.status(404).json({ error: "Paket tidak ditemukan" });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to delete premium plan" });
   }
 });
 

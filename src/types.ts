@@ -625,6 +625,7 @@ export interface PremiumPlan {
   description: string;
   badge?: string;
   benefits: string[];
+  popular?: boolean;
   isPopular: boolean;
   isActive: boolean;
   sortOrder: number;
