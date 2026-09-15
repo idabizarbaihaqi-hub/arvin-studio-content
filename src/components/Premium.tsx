@@ -24,67 +24,30 @@ import {
   validatePaymentProofFile,
 } from '../services/accessControlService';
 import { getActivePaymentAccounts } from '../services/paymentAccountService';
+import { getActivePremiumPlans } from '../services/premiumPlanService';
 
 interface PremiumProps {
   onBack: () => void;
 }
 
-interface PackagePlan {
+export interface PackagePlan {
+  id?: string;
   name: string;
   price: number;
   duration: string;
   popular?: boolean;
+  badge?: string;
+  description?: string;
   benefits: string[];
 }
-
-const PACKAGES: PackagePlan[] = [
-  {
-    name: 'PREMIUM 7 HARI',
-    price: 50000,
-    duration: '7 Hari',
-    benefits: [
-      'Akses tanpa batas seluruh AI Creator Tools',
-      'Chat AI tanpa limit 5x/hari',
-      'Content Analyzer & Content Ideas unlimited',
-      'Caption Maker, Hook & Script Maker unlimited',
-      'Hashtag Generator unlimited',
-      'Content Planner & Kalender Terjadwal',
-      'Analytics & Pelacakan AI Usage',
-      'Bebas Iklan & Premium Badge Kreator',
-    ],
-  },
-  {
-    name: 'PREMIUM 30 HARI',
-    price: 150000,
-    duration: '30 Hari',
-    popular: true,
-    benefits: [
-      'Semua keuntungan paket 7 hari',
-      'Akses 30 hari penuh tanpa batas',
-      'Hemat 40% dibandingkan mingguan',
-      'Prioritas pemrosesan server berkecepatan tinggi',
-      'Ekspor riwayat dan jadwal konten tanpa batas',
-      'Dukungan prioritas kreator ARVIN',
-    ],
-  },
-  {
-    name: 'PREMIUM 12 BULAN',
-    price: 180000,
-    duration: '12 Bulan',
-    benefits: [
-      'Semua fitur dan alat premium tanpa batas',
-      'Akses penuh 365 hari untuk kreator profesional',
-      'Hemat maksimal hingga 60%',
-      'Akses awal ke fitur baru mendatang',
-      'Konsultasi optimasi alur kerja konten',
-    ],
-  },
-];
 
 export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Dynamic Premium Plans from Firestore
+  const [availablePlans, setAvailablePlans] = useState<PackagePlan[]>([]);
 
   // Dynamic Payment Accounts (Tahap 8C)
   const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([]);
@@ -109,16 +72,30 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
     try {
       setLoading(true);
       setLoadingAccounts(true);
-      const [userProf, userSubs, activeAccounts] = await Promise.all([
+      const [userProf, userSubs, activeAccounts, firestorePlans] = await Promise.all([
         getUserProfile(),
         fetchUserSubscriptions(),
         getActivePaymentAccounts(),
+        getActivePremiumPlans(),
       ]);
       setProfile(userProf);
       setSubscriptions(userSubs);
       setPaymentAccounts(activeAccounts);
+
+      // Map Firestore plans to user-facing package format
+      const mappedPlans: PackagePlan[] = (firestorePlans || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        duration: `${p.duration} ${p.durationUnit}`,
+        popular: Boolean(p.isPopular),
+        badge: p.badge,
+        description: p.description,
+        benefits: Array.isArray(p.benefits) ? p.benefits : [],
+      }));
+      setAvailablePlans(mappedPlans);
     } catch (err) {
-      console.error('Failed to load subscription or payment account data:', err);
+      console.error('Failed to load subscription, plans, or payment account data:', err);
     } finally {
       setLoading(false);
       setLoadingAccounts(false);
@@ -605,7 +582,12 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    const pkg = PACKAGES.find((p) => p.name === pendingPaymentSub.plan) || PACKAGES[0];
+                    const pkg = availablePlans.find((p) => p.name === pendingPaymentSub.plan) || {
+                      name: pendingPaymentSub.plan,
+                      price: pendingPaymentSub.price,
+                      duration: pendingPaymentSub.duration,
+                      benefits: [],
+                    };
                     setSelectedPlan(pkg);
                     setActiveSubscriptionId(pendingPaymentSub.id);
                     setSubmissionSuccess(false);
@@ -617,78 +599,97 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
               </div>
             )}
 
-            {/* 3 Packages Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {PACKAGES.map((pkg) => (
-                <div
-                  key={pkg.name}
-                  className={`bg-white rounded-3xl p-6 flex flex-col justify-between relative transition-all ${
-                    pkg.popular
-                      ? 'border-2 border-slate-900 shadow-md ring-4 ring-slate-900/5'
-                      : 'border border-slate-200/90 shadow-xs hover:border-slate-300'
-                  }`}
-                >
-                  {pkg.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-slate-900 text-white text-[11px] font-bold rounded-full shadow-xs">
-                      PALING POPULER
-                    </div>
-                  )}
+            {/* Dynamic Packages Cards from Firestore */}
+            {availablePlans.length === 0 ? (
+              <div className="p-10 text-center bg-white rounded-3xl border border-slate-200/90 shadow-xs max-w-lg mx-auto space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto">
+                  <Crown className="w-7 h-7" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-base">Belum Ada Paket Premium Aktif</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Paket langganan premium sedang dipersiapkan oleh Super Admin. Silakan periksa kembali nanti.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {availablePlans.map((pkg) => (
+                  <div
+                    key={pkg.id || pkg.name}
+                    className={`bg-white rounded-3xl p-6 flex flex-col justify-between relative transition-all ${
+                      pkg.popular
+                        ? 'border-2 border-slate-900 shadow-md ring-4 ring-slate-900/5'
+                        : 'border border-slate-200/90 shadow-xs hover:border-slate-300'
+                    }`}
+                  >
+                    {pkg.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-slate-900 text-white text-[11px] font-bold rounded-full shadow-xs">
+                        PALING POPULER
+                      </div>
+                    )}
 
-                  <div>
-                    <div className="flex items-center justify-between mb-3 mt-1">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                          pkg.popular
-                            ? 'bg-slate-900 text-white border-slate-900'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {pkg.duration}
-                      </span>
-                      <Crown
-                        className={`w-5 h-5 ${pkg.popular ? 'text-amber-500' : 'text-slate-400'}`}
-                      />
-                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-3 mt-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                              pkg.popular
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {pkg.duration}
+                          </span>
+                          {pkg.badge && (
+                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+                              {pkg.badge}
+                            </span>
+                          )}
+                        </div>
+                        <Crown
+                          className={`w-5 h-5 ${pkg.popular ? 'text-amber-500' : 'text-slate-400'}`}
+                        />
+                      </div>
 
-                    <h2 className="text-xl font-bold text-slate-900 mb-1">{pkg.name}</h2>
-                    <p className="text-xs text-slate-500 mb-4">
-                      Masa aktif {pkg.duration} penuh tanpa batas
-                    </p>
+                      <h2 className="text-xl font-bold text-slate-900 mb-1">{pkg.name}</h2>
+                      <p className="text-xs text-slate-500 mb-4">
+                        {pkg.description || `Masa aktif ${pkg.duration} penuh tanpa batas`}
+                      </p>
 
-                    <div className="mb-6">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-3xl font-black text-slate-900">
-                          {formatRupiah(pkg.price)}
-                        </span>
-                        <span className="text-xs text-slate-500 font-medium">/ {pkg.duration}</span>
+                      <div className="mb-6">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black text-slate-900">
+                            {formatRupiah(pkg.price)}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">/ {pkg.duration}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5 text-xs text-slate-600 pt-4 border-t border-slate-100">
+                        {pkg.benefits.map((b, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <span>{b}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="space-y-2.5 text-xs text-slate-600 pt-4 border-t border-slate-100">
-                      {pkg.benefits.map((b, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          <span>{b}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <button
+                      type="button"
+                      id={`btn-select-package-${pkg.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      onClick={() => handleSelectPackage(pkg)}
+                      className={`mt-6 w-full py-3 px-4 rounded-xl font-semibold text-xs sm:text-sm transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2 ${
+                        pkg.popular
+                          ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-900'
+                      }`}
+                    >
+                      <span>Pilih Paket {pkg.duration}</span>
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    id={`btn-select-package-${pkg.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    onClick={() => handleSelectPackage(pkg)}
-                    className={`mt-6 w-full py-3 px-4 rounded-xl font-semibold text-xs sm:text-sm transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2 ${
-                      pkg.popular
-                        ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-900'
-                    }`}
-                  >
-                    <span>Pilih Paket {pkg.duration}</span>
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -739,7 +740,12 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
                           <button
                             type="button"
                             onClick={() => {
-                              const pkg = PACKAGES.find((p) => p.name === sub.plan) || PACKAGES[0];
+                              const pkg = availablePlans.find((p) => p.name === sub.plan) || {
+                                name: sub.plan,
+                                price: sub.price,
+                                duration: sub.duration,
+                                benefits: [],
+                              };
                               setSelectedPlan(pkg);
                               setActiveSubscriptionId(sub.id);
                               setSubmissionSuccess(false);

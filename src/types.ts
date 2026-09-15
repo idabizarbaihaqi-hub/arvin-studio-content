@@ -614,6 +614,40 @@ export interface PaymentAccount {
   updatedBy: string;
 }
 
+export type DurationUnit = 'Hari' | 'Bulan' | 'Tahun';
+
+export interface PremiumPlan {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+  durationUnit: DurationUnit;
+  description: string;
+  badge?: string;
+  benefits: string[];
+  isPopular: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  isDeleted?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface PremiumPlanInput {
+  name: string;
+  price: number;
+  duration: number;
+  durationUnit: DurationUnit;
+  description: string;
+  badge?: string;
+  benefits: string[];
+  isPopular: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export interface SubscriptionRecord {
   id: string;
   userId: string;
@@ -727,6 +761,7 @@ export type AdminViewKey =
   | 'dashboard'
   | 'user-management'
   | 'premium-management'
+  | 'premium-plans'
   | 'payment-verification'
   | 'payment-accounts'
   | 'credit-management'

@@ -143,6 +143,15 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
+    // Match premium_plans collection (Super Admin manages dynamically, users/visitors read active plans)
+    match /premium_plans/{planId} {
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin() && (
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
+      );
+    }
+
     // Match system_settings collection (Super Admin global config, e.g. Gemini AI Key)
     match /system_settings/{settingId} {
       allow read: if isAuthenticated();

@@ -24,6 +24,7 @@ import { SystemSettings } from './SystemSettings';
 import { PaymentAccountManagement } from './PaymentAccountManagement';
 import { FounderManagement } from './FounderManagement';
 import { BrandLogoManagement } from './BrandLogoManagement';
+import { PremiumPlansManagement } from './PremiumPlansManagement';
 
 interface AdminPanelProps {
   currentUser: UserProfile | null;
@@ -186,6 +187,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {currentView === 'premium-management' && (
             <PremiumManagement />
+          )}
+
+          {currentView === 'premium-plans' && (
+            <PremiumPlansManagement currentUser={currentUser} />
           )}
 
           {currentView === 'credit-management' && (

@@ -207,6 +207,34 @@
         "updatedBy": { "type": "string", "description": "Email super admin pengubah" }
       },
       "required": []
+    },
+    "PremiumPlan": {
+      "title": "PremiumPlan",
+      "description": "Paket langganan Premium ARVIN STUDIO di collection premium_plans",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik dokumen paket" },
+        "name": { "type": "string", "description": "Nama paket premium" },
+        "price": { "type": "number", "description": "Harga paket numerik dalam Rupiah" },
+        "duration": { "type": "number", "description": "Durasi numerik masa aktif paket" },
+        "durationUnit": { "type": "string", "enum": ["Hari", "Bulan", "Tahun"], "description": "Satuan durasi" },
+        "description": { "type": "string", "description": "Deskripsi singkat paket" },
+        "badge": { "type": "string", "description": "Badge/label tambahan opsional" },
+        "benefits": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Daftar poin manfaat paket premium"
+        },
+        "isPopular": { "type": "boolean", "description": "Tandai paket sebagai paket populer" },
+        "isActive": { "type": "boolean", "description": "Status keaktifan paket untuk publik" },
+        "sortOrder": { "type": "number", "description": "Urutan tampilan paket" },
+        "isDeleted": { "type": "boolean", "description": "Flag soft delete untuk menjaga riwayat" },
+        "createdAt": { "type": "string", "description": "Waktu pembuatan ISO" },
+        "updatedAt": { "type": "string", "description": "Waktu pembaruan ISO" },
+        "createdBy": { "type": "string", "description": "UID / email pembuat paket" },
+        "updatedBy": { "type": "string", "description": "UID / email pengubah paket" }
+      },
+      "required": ["id", "name", "price", "duration", "durationUnit", "benefits", "isPopular", "isActive", "sortOrder", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -233,6 +261,10 @@
     "/payment_accounts/{accountId}": {
       "schema": { "$ref": "#/entities/PaymentAccount" },
       "description": "Daftar rekening bank pembayaran langganan resmi"
+    },
+    "/premium_plans/{planId}": {
+      "schema": { "$ref": "#/entities/PremiumPlan" },
+      "description": "Daftar paket langganan premium resmi ARVIN STUDIO"
     },
     "/ai_history/{historyId}": {
       "schema": { "$ref": "#/entities/AiHistory" },

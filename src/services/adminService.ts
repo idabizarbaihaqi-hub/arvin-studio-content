@@ -338,9 +338,28 @@ export function calculatePlanEndDate(
   durationStr?: string,
   startDate: Date = new Date()
 ): string {
-  const p = (planName || '').toUpperCase();
-  const d = (durationStr || '').toUpperCase();
+  const p = (planName || '').toUpperCase().trim();
+  const d = (durationStr || '').toUpperCase().trim();
   const end = new Date(startDate.getTime());
+
+  // Check if durationStr has explicit number + unit (e.g. "14 HARI", "3 BULAN", "1 TAHUN", "30 HARI")
+  const durMatch = d.match(/^(\d+)\s*(HARI|DAY|DAYS|BULAN|MONTH|MONTHS|TAHUN|YEAR|YEARS)$/i);
+  if (durMatch) {
+    const amount = parseInt(durMatch[1], 10);
+    const unit = durMatch[2].toUpperCase();
+    if (unit.startsWith('HARI') || unit.startsWith('DAY')) {
+      end.setDate(end.getDate() + amount);
+      return end.toISOString();
+    }
+    if (unit.startsWith('BULAN') || unit.startsWith('MONTH')) {
+      end.setMonth(end.getMonth() + amount);
+      return end.toISOString();
+    }
+    if (unit.startsWith('TAHUN') || unit.startsWith('YEAR')) {
+      end.setFullYear(end.getFullYear() + amount);
+      return end.toISOString();
+    }
+  }
 
   if (
     p.includes('12_MONTHS') ||

@@ -16,10 +16,12 @@ import {
   Landmark,
   Award,
   Palette,
+  Gem,
 } from 'lucide-react';
 import { AdminViewKey, UserProfile } from '../../types';
 import { AsLogo } from '../AsLogo';
 import { AppLogo } from '../AppLogo';
+import { isPremiumPlansAdmin } from '../../services/premiumPlanService';
 
 interface AdminSidebarProps {
   isOpen: boolean;
@@ -40,6 +42,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   currentUser,
   pendingCount = 0,
 }) => {
+  const canManagePlans = isPremiumPlansAdmin(currentUser);
+
   const navSections = [
     {
       group: 'DASHBOARD',
@@ -51,6 +55,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       group: 'MANAGEMENT',
       items: [
         { key: 'user-management' as AdminViewKey, label: 'User Management', icon: Users },
+        ...(canManagePlans
+          ? [
+              {
+                key: 'premium-plans' as AdminViewKey,
+                label: 'Premium Plans',
+                icon: Gem,
+              },
+            ]
+          : []),
         { key: 'premium-management' as AdminViewKey, label: 'Premium Management', icon: CreditCard },
         {
           key: 'payment-verification' as AdminViewKey,
