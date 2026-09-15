@@ -20,6 +20,7 @@ import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { Sidebar } from './components/Sidebar';
 import { EmptyState } from './components/EmptyState';
+import { CreateWorkspaceEmpty } from './components/CreateWorkspaceEmpty';
 import { ChatMessageItem } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { LoadingIndicator } from './components/LoadingIndicator';
@@ -58,7 +59,7 @@ export default function App() {
       ? 'admin'
       : 'dashboard';
   });
-  const [activeView, setActiveView] = useState<ActiveView>('chat');
+  const [activeView, setActiveView] = useState<ActiveView>('home');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -172,7 +173,7 @@ export default function App() {
     setInputText('');
     activeUserIdRef.current = null;
     setUnauthView('login');
-    setActiveView('chat');
+    setActiveView('home');
     setAppRoute('dashboard');
     window.history.pushState(null, '', '/');
     setIsSidebarOpen(false);
@@ -190,7 +191,7 @@ export default function App() {
       window.history.pushState(null, '', '/admin');
     } else {
       setAppRoute('dashboard');
-      setActiveView('chat');
+      setActiveView('home');
       window.history.pushState(null, '', '/dashboard');
     }
   };
@@ -550,9 +551,32 @@ export default function App() {
           onBackToChat={() => setActiveView('chat')}
           onNavigateToTool={(toolId) => setActiveView(toolId as ActiveView)}
         />
+      ) : activeView === 'home' ? (
+        /* ---------------- Home Studio Dashboard (No Chat Footer!) ---------------- */
+        <main
+          id="home-main-container"
+          className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col w-full pb-24 sm:pb-8"
+        >
+          <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col py-3 sm:py-4">
+            <EmptyState
+              onSelectImage={(attachment) => {
+                setAttachedImage(attachment);
+                setActiveView('chat');
+              }}
+              onSelectPrompt={(promptText) => {
+                setActiveView('chat');
+                handleSendMessage(promptText);
+              }}
+              onNavigate={setActiveView}
+              currentUser={currentUser}
+              chatQuota={chatQuota}
+            />
+          </div>
+        </main>
       ) : (
-        <>
-          {/* Main Conversation Canvas */}
+        /* ---------------- Create & Chat AI Workspace ---------------- */
+        <div id="chat-workspace-view" className="flex-1 flex flex-col w-full overflow-hidden relative">
+          {/* Main Conversation Canvas or Create Workspace Starter */}
           <main
             id="chat-main-container"
             ref={scrollContainerRef}
@@ -560,19 +584,20 @@ export default function App() {
           >
             <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col py-3 sm:py-4">
               {messages.length === 0 ? (
-                <EmptyState
+                <CreateWorkspaceEmpty
+                  onSelectPrompt={(promptText) => {
+                    setInputText(promptText);
+                    setTimeout(() => {
+                      const textarea = document.getElementById('chat-textarea');
+                      textarea?.focus();
+                    }, 60);
+                  }}
                   onSelectImage={(attachment) => {
                     setAttachedImage(attachment);
                   }}
-                  onSelectPrompt={(promptText) => {
-                    handleSendMessage(promptText);
-                  }}
-                  onNavigate={setActiveView}
-                  currentUser={currentUser}
-                  chatQuota={chatQuota}
                 />
               ) : (
-                <div id="messages-list" className="flex-1 flex flex-col w-full">
+                <div id="messages-list" className="flex-1 flex flex-col w-full px-3 sm:px-0">
                   {messages.map((msg, index) => (
                     <ChatMessageItem
                       key={msg.id}
@@ -589,10 +614,13 @@ export default function App() {
             </div>
           </main>
 
-          {/* Chat Input Container with Free Credit Status Indicator */}
-          <footer id="chat-footer" className="w-full shrink-0">
+          {/* Chat Input Container cleanly docked right above mobile bottom nav */}
+          <footer
+            id="chat-footer"
+            className="w-full shrink-0 mb-[56px] sm:mb-0 bg-white border-t border-slate-100 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] pt-1"
+          >
             {/* Chat AI Credit Status Pill */}
-            <div className="max-w-3xl mx-auto px-4 pb-1 flex items-center justify-between text-xs text-slate-500 select-none">
+            <div className="max-w-3xl mx-auto px-4 pb-0.5 flex items-center justify-between text-xs text-slate-500 select-none">
               <div className="flex items-center gap-2 font-medium">
                 <span
                   className={`inline-block w-2 h-2 rounded-full ${
@@ -653,13 +681,13 @@ export default function App() {
               placeholder={
                 !chatQuota.isPremium && chatQuota.remaining === 0
                   ? 'Limit Chat AI harian (3/3) telah habis. Upgrade ke Premium untuk melanjutkan...'
-                  : 'Tulis pesan atau unggah gambar/screenshot...'
+                  : 'Tulis ide, topik konten, atau tanya AI...'
               }
               attachedImage={attachedImage}
               onAttachImage={setAttachedImage}
             />
           </footer>
-        </>
+        </div>
       )}
 
       {/* Navigation Sidebar (Only rendered when logged in!) */}

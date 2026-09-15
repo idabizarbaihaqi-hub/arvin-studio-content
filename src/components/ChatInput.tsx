@@ -136,17 +136,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <div
       id="chat-input-container"
-      className="w-full px-3 sm:px-8 pt-2 pb-20 sm:pb-5 bg-gradient-to-t from-white via-white/95 to-transparent shrink-0 sticky bottom-0 z-10"
+      className="w-full px-3 sm:px-6 pt-1 pb-2 sm:pb-3 bg-white shrink-0"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <form
         onSubmit={handleSubmit}
-        className={`max-w-3xl mx-auto relative flex flex-col bg-white border rounded-2xl sm:rounded-3xl p-2 pl-3 sm:pl-4 pr-2 sm:pr-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-all ${
+        className={`max-w-3xl mx-auto relative flex flex-col bg-slate-50/80 border rounded-2xl p-1.5 pl-2.5 sm:pl-3.5 pr-1.5 shadow-2xs transition-all ${
           isDragging
-            ? 'border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/20'
-            : 'border-slate-200/90 focus-within:ring-2 focus-within:ring-blue-500/15 focus-within:border-blue-500'
+            ? 'border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30'
+            : 'border-slate-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/15 focus-within:border-blue-500'
         }`}
       >
         {/* Hidden File Input for Image Upload */}
@@ -160,11 +160,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Attached Image Preview Chip */}
         {attachedImage && (
-          <div className="flex items-center gap-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl p-1.5 pr-3 mb-2 max-w-fit animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200/80 rounded-xl p-1.5 pr-2.5 mb-1.5 max-w-fit animate-in fade-in duration-150">
             <img
               src={attachedImage.data}
               alt="Preview"
-              className="w-10 h-10 object-cover rounded-lg border border-blue-200 bg-white"
+              className="w-9 h-9 object-cover rounded-lg border border-blue-200 bg-white"
             />
             <div className="flex flex-col min-w-0 pr-1">
               <span className="text-xs font-semibold text-slate-800 truncate max-w-[180px] sm:max-w-[240px]">
@@ -179,15 +179,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={() => onAttachImage(null)}
                 aria-label="Hapus gambar"
-                className="w-6 h-6 rounded-full hover:bg-blue-200/70 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                className="w-5 h-5 rounded-full hover:bg-blue-200/70 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer ml-1"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             )}
           </div>
         )}
 
-        <div className="flex items-end gap-2 w-full">
+        <div className="flex items-end gap-1.5 sm:gap-2 w-full">
           {/* Upload Image Button */}
           <button
             id="btn-upload-chat-image"
@@ -196,9 +196,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={isLoading}
             title="Unggah Gambar atau Screenshot (Gemini Vision)"
             aria-label="Unggah Gambar"
-            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer mb-0.5"
+            className="shrink-0 w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-slate-200/60 transition-colors cursor-pointer mb-0.5"
           >
-            <ImageIcon className="w-5 h-5 stroke-[1.8]" />
+            <ImageIcon className="w-4.5 h-4.5 stroke-[1.8]" />
           </button>
 
           <textarea
@@ -219,8 +219,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             autoCapitalize="sentences"
             autoCorrect="on"
             spellCheck={false}
-            className="flex-1 w-full resize-none bg-transparent py-2 sm:py-2.5 px-1 text-sm sm:text-base text-slate-800 placeholder:text-slate-400 focus:outline-hidden disabled:opacity-50 max-h-[160px] overflow-y-auto leading-relaxed"
-            style={{ minHeight: '40px' }}
+            className="flex-1 w-full resize-none bg-transparent py-1.5 sm:py-2 px-1 text-[13px] sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden disabled:opacity-50 max-h-[140px] overflow-y-auto leading-relaxed"
+            style={{ minHeight: '36px' }}
           />
 
           <button
@@ -232,23 +232,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={!canSend}
             title="Kirim pesan"
             aria-label="Kirim pesan"
-            className={`shrink-0 w-10 h-10 sm:w-10.5 sm:h-10.5 rounded-xl flex items-center justify-center transition-all ${
+            className={`shrink-0 w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all ${
               canSend
-                ? 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white cursor-pointer shadow-md shadow-blue-500/25'
-                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                ? 'bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-95 text-white cursor-pointer shadow-xs'
+                : 'bg-slate-200/80 text-slate-400 cursor-not-allowed'
             }`}
           >
-            <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+            <ArrowUp className="w-4.5 h-4.5 stroke-[2.5]" />
           </button>
         </div>
       </form>
 
-      <div className="mt-2 sm:mt-2.5 flex flex-wrap justify-center items-center gap-2 sm:gap-4 text-[10px] text-slate-400 font-medium tracking-wider uppercase text-center">
+      {/* Desktop Helper Note */}
+      <div className="hidden sm:flex mt-1.5 justify-center items-center gap-3 text-[10px] text-slate-400 font-medium tracking-wider uppercase text-center">
         <span>Enter kirim</span>
         <span>•</span>
         <span>Shift + Enter baris baru</span>
-        <span className="hidden sm:inline">•</span>
-        <span className="hidden sm:inline">Paste screenshot (Ctrl+V)</span>
+        <span>•</span>
+        <span>Paste screenshot (Ctrl+V)</span>
       </div>
     </div>
   );

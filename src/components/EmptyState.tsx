@@ -2,22 +2,23 @@ import React, { useRef, useState } from 'react';
 import {
   Sparkles,
   UploadCloud,
-  MessageSquare,
   BarChart3,
-  Lightbulb,
   FileText,
   Flame,
   Film,
   Hash,
   Calendar,
-  ArrowRight,
-  Crown,
-  CheckCircle2,
-  TrendingUp,
   Layers,
-  Zap,
+  TrendingUp,
+  Image as ImageIcon,
+  Video,
+  PenTool,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { AppLogo } from './AppLogo';
+import { TechArtBlob } from './TechArtBlob';
 import { ChatImageAttachment, ActiveView, UserProfile } from '../types';
 
 interface EmptyStateProps {
@@ -41,7 +42,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   chatQuota,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [showMoreTools, setShowMoreTools] = useState(false);
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -74,142 +75,128 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     e.target.value = '';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
-  };
-
-  const popularTools = [
+  // 6 Primary AI Tools matching the reference image layout exactly
+  const primaryAiTools = [
     {
-      id: 'chat-tool',
-      title: 'Chat AI & Vision',
-      desc: 'Tanya jawab ide, strategi, serta analisis tangkapan layar postingan',
-      icon: MessageSquare,
-      badge: 'Free / Pro',
-      badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+      id: 'ai-content-generator',
+      title: 'AI Content Generator',
+      desc: 'Generate high-quality content instantly.',
+      badge: 'Premium',
+      badgeType: 'amber',
+      icon: Sparkles,
       action: () => {
-        const textarea = document.getElementById('chat-textarea');
-        textarea?.focus();
+        if (onNavigate) {
+          onNavigate('chat');
+        } else if (onSelectPrompt) {
+          onSelectPrompt('Buatkan konsep dan strategi konten kreatif berbobot tinggi untuk: ');
+        }
       },
     },
     {
-      id: 'script-maker',
-      title: 'Script Maker',
-      desc: 'Naskah video terstruktur untuk TikTok, Reels, dan YouTube Shorts',
-      icon: Film,
-      badge: 'Populer',
-      badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-      action: () => onNavigate && onNavigate('script-maker'),
+      id: 'ai-thumbnail-generator',
+      title: 'AI Thumbnail Generator',
+      desc: 'Create engaging video thumbnails.',
+      badge: 'Premium',
+      badgeType: 'amber',
+      icon: Video,
+      action: () => fileInputRef.current?.click(),
     },
     {
-      id: 'caption-maker',
-      title: 'Caption Maker',
-      desc: 'Generator 3 variasi caption berkonversi tinggi lengkap dengan hashtag',
+      id: 'ai-content-analyzer',
+      title: 'AI Content Analyzer',
+      desc: 'Optimize your content performance.',
+      badge: 'Free',
+      badgeType: 'gray',
+      icon: BarChart3,
+      action: () => onNavigate && onNavigate('content-analyzer'),
+    },
+    {
+      id: 'ai-image-tools',
+      title: 'AI Image Tools',
+      desc: 'Edit and enhance visuals with AI.',
+      badge: 'Free',
+      badgeType: 'gray',
+      icon: ImageIcon,
+      action: () => fileInputRef.current?.click(),
+    },
+    {
+      id: 'ai-copywriting',
+      title: 'AI Copywriting',
+      desc: 'Craft compelling copy.',
+      badge: 'Premium',
+      badgeType: 'amber',
       icon: FileText,
-      badge: 'Viral',
-      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       action: () => onNavigate && onNavigate('caption-maker'),
+    },
+    {
+      id: 'ai-creator-tools',
+      title: 'AI Creator Tools',
+      desc: 'Advanced tools for creators.',
+      badge: 'Premium',
+      badgeType: 'amber',
+      icon: PenTool,
+      action: () => onNavigate && onNavigate('hook-generator'),
+    },
+  ];
+
+  // Secondary suite of AI Creator tools preserved for 100% functionality
+  const secondaryTools = [
+    {
+      id: 'script-maker',
+      title: 'Script Maker',
+      desc: 'Naskah video terstruktur untuk TikTok, Reels, dan Shorts.',
+      badge: 'Populer',
+      icon: Film,
+      view: 'script-maker' as ActiveView,
     },
     {
       id: 'hook-generator',
       title: 'Hook Generator',
-      desc: 'Kalimat pembuka bervoltase tinggi untuk menahan scroll penonton',
+      desc: 'Kalimat pembuka bervoltase tinggi untuk menahan scroll penonton.',
+      badge: 'Viral',
       icon: Flame,
-      badge: 'Retensi Tinggi',
-      badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
-      action: () => onNavigate && onNavigate('hook-generator'),
+      view: 'hook-generator' as ActiveView,
     },
-    {
-      id: 'content-analyzer',
-      title: 'Content Analyzer',
-      desc: 'Audit skor metriks, engagement, dan saran perbaikan copy konten',
-      icon: BarChart3,
-      badge: 'Insight',
-      badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-      action: () => onNavigate && onNavigate('content-analyzer'),
-    },
-    {
-      id: 'content-ideas',
-      title: 'Content Ideas',
-      desc: 'Eksplorasi topik tren, sudut pandang unik, dan pilar konten spesifik',
-      icon: Lightbulb,
-      badge: 'Kreatif',
-      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      action: () => onNavigate && onNavigate('content-ideas'),
-    },
-  ];
-
-  const allAiTools = [
     {
       id: 'hashtag-generator',
       title: 'Hashtag Generator',
-      desc: 'Kurasi tagar terarah sesuai niche dan platform target',
+      desc: 'Kurasi tagar bertarget sesuai platform dan topik konten.',
+      badge: 'SEO',
       icon: Hash,
-      badge: 'Free',
       view: 'hashtag-generator' as ActiveView,
     },
     {
       id: 'content-planner',
       title: 'Content Planner',
-      desc: 'Atur jadwal rilis, pilar editorial, dan kalender konten',
+      desc: 'Jadwal rilis, pilar editorial, dan kalender konten otomatis.',
+      badge: 'Workflow',
       icon: Calendar,
-      badge: 'Pro',
       view: 'content-planner' as ActiveView,
     },
     {
       id: 'analytics',
       title: 'Analytics Konten',
-      desc: 'Pantau riwayat penggunaan alat AI dan metrik produktivitas',
+      desc: 'Pantau riwayat penggunaan alat AI dan metrik produktivitas.',
+      badge: 'Insight',
       icon: TrendingUp,
-      badge: 'Pro',
       view: 'analytics' as ActiveView,
     },
     {
       id: 'history',
       title: 'Riwayat Ekspor',
-      desc: 'Akses kembali semua teks, caption, dan naskah yang pernah dibuat',
+      desc: 'Akses kembali semua teks, caption, dan naskah yang pernah dibuat.',
+      badge: 'Arsip',
       icon: Layers,
-      badge: 'Tersimpan',
       view: 'history' as ActiveView,
-    },
-  ];
-
-  const quickPrompts = [
-    {
-      label: 'Analisis Screenshot Postingan',
-      prompt:
-        'Tolong analisis tangkapan layar postingan ini, berikan evaluasi performa visual, hook pembuka, dan saran perbaikan agar interaksinya lebih tinggi.',
-    },
-    {
-      label: 'Buat 3 Variasi Caption Menarik',
-      prompt:
-        'Tolong buatkan 3 opsi caption kreatif untuk produk/konten ini lengkap dengan hook pembuka, storytelling, dan call-to-action yang relevan.',
-    },
-    {
-      label: 'Riset 5 Sudut Pandang Konten Viral',
-      prompt:
-        'Berikan 5 ide konten yang tidak umum tapi sangat relevan dengan niche kreator edukasi & bisnis digital di tahun ini.',
     },
   ];
 
   return (
     <div
       id="arvin-studio-home"
-      className="w-full flex-1 flex flex-col items-center px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-7 sm:space-y-9 max-w-5xl mx-auto select-text"
+      className="w-full flex-1 flex flex-col px-4 sm:px-6 py-2 sm:py-4 space-y-5 sm:space-y-6 max-w-lg sm:max-w-2xl lg:max-w-3xl mx-auto select-text pb-10"
     >
-      {/* Hidden File Input for Vision AI */}
+      {/* Hidden File Input for Vision AI Uploads */}
       <input
         ref={fileInputRef}
         type="file"
@@ -218,235 +205,94 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* 1. HERO SECTION (Clean White + Electric Blue Accents + Geometric Abstract Tech Art) */}
+      {/* 1. HERO SECTION (Identical to Visual Reference Image) */}
       <section
         id="home-hero-section"
-        className="w-full relative overflow-hidden bg-white rounded-3xl border border-slate-200/80 shadow-[0_4px_20px_rgba(37,99,235,0.05)] p-6 sm:p-10 lg:p-12 text-center flex flex-col items-center"
+        className="w-full flex items-center justify-between gap-4 pt-1 sm:pt-2"
       >
-        {/* Subtle Futuristic Abstract Graphic (Pure CSS & SVG lines - strictly no AI robots) */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none overflow-hidden opacity-60"
-        >
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-gradient-to-br from-blue-100/70 via-indigo-50/40 to-transparent blur-2xl" />
-          <div className="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-gradient-to-tr from-sky-100/60 to-transparent blur-2xl" />
-          <svg
-            className="absolute top-0 right-0 w-96 h-96 text-blue-100/40 stroke-current"
-            viewBox="0 0 200 200"
-            fill="none"
-          >
-            <circle cx="150" cy="50" r="80" strokeWidth="0.75" strokeDasharray="3 3" />
-            <circle cx="150" cy="50" r="50" strokeWidth="0.75" />
-            <path d="M 50 150 Q 120 80 180 120" strokeWidth="1" />
-          </svg>
-        </div>
+        <div className="flex-1 min-w-0 pr-1">
+          {/* Greeting */}
+          <p className="text-[13px] sm:text-sm font-medium text-slate-700 leading-tight">
+            Halo{currentUser?.fullName ? `, ${currentUser.fullName}` : ''}, siap berkarya?
+          </p>
 
-        {/* Studio Badge */}
-        <div className="relative z-10 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50/90 border border-blue-200/80 mb-4 sm:mb-5">
-          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-          <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-blue-700">
-            SaaS AI Kreator Konten Modern
-          </span>
-        </div>
+          {/* Main Headline */}
+          <h1 className="text-[21px] sm:text-3xl font-black tracking-tight text-slate-950 leading-[1.18] mt-1 mb-1.5 sm:mb-2">
+            Semua Tools Kreator,<br />
+            Dalam Satu Studio.
+          </h1>
 
-        {/* Greeting */}
-        <p className="relative z-10 text-xs sm:text-sm font-semibold text-slate-500 mb-1.5 sm:mb-2">
-          Halo{currentUser?.fullName ? `, ${currentUser.fullName}` : ''}, siap berkarya?
-        </p>
+          {/* Subtitle */}
+          <p className="text-[11.5px] sm:text-[13px] text-slate-500 leading-snug max-w-[210px] sm:max-w-md">
+            Berbagai AI tools untuk membuat, menganalisis, dan mengembangkan konten.
+          </p>
 
-        {/* Primary Headline */}
-        <h1 className="relative z-10 text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 max-w-2xl leading-tight sm:leading-tight mb-3 sm:mb-4">
-          Semua Tools Kreator, Dalam Satu Studio.
-        </h1>
-
-        {/* Subheadline */}
-        <p className="relative z-10 text-sm sm:text-base text-slate-600 max-w-xl leading-relaxed mb-6 sm:mb-8 font-normal">
-          ARVIN STUDIO adalah workspace AI cerdas untuk membuat, menganalisis, dan mengembangkan
-          konten berkualitas tinggi dalam hitungan detik.
-        </p>
-
-        {/* Primary Actions */}
-        <div className="relative z-10 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          {/* Blue CTA Button */}
           <button
-            id="btn-hero-cta"
+            id="btn-hero-mulai-berkarya"
             type="button"
             onClick={() => {
-              const textarea = document.getElementById('chat-textarea');
-              if (textarea) {
-                textarea.focus();
-                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              if (onNavigate) {
+                onNavigate('chat');
+              } else if (onSelectPrompt) {
+                onSelectPrompt('Halo ARVIN STUDIO, saya ingin membuat ide konten hari ini.');
               }
             }}
-            className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            className="mt-3 sm:mt-4 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-98 text-white text-[12.5px] sm:text-sm font-semibold shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
           >
-            <Sparkles className="w-4 h-4" />
             <span>Mulai Berkarya</span>
-            <ArrowRight className="w-4 h-4 ml-0.5" />
           </button>
+        </div>
 
-          <button
-            id="btn-hero-upload-cta"
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-sm border border-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <UploadCloud className="w-4 h-4 text-slate-600" />
-            <span>Unggah Gambar (Vision AI)</span>
-          </button>
+        {/* Right: 3D Organic Cyber Network Graphic (Exact Reproduction) */}
+        <div className="shrink-0 flex items-center justify-center">
+          <TechArtBlob size={128} className="sm:w-[155px] sm:h-[155px]" />
         </div>
       </section>
 
-      {/* 2. USER STATISTICS (Minimal, clean, Real Data, No Dummy) */}
-      <section
-        id="home-user-stats"
-        aria-label="Statistik Penggunaan Akun"
-        className="w-full grid grid-cols-3 gap-2.5 sm:gap-4"
-      >
-        {/* Stat 1: AI Uses Today */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3 sm:p-5 shadow-xs flex flex-col items-center sm:items-start text-center sm:text-left transition-all hover:border-slate-300">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            AI Uses Today
-          </span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-lg sm:text-2xl font-black text-slate-900">
-              {chatQuota ? chatQuota.count : '-'}
-            </span>
-            <span className="text-xs sm:text-sm text-slate-400 font-medium">
-              /{chatQuota ? (chatQuota.isPremium ? '∞' : chatQuota.limit) : '3'}
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-1 hidden sm:inline">
-            {chatQuota?.isPremium ? 'Akses Unlimited' : 'Reset harian 00:00 WIB'}
-          </span>
-        </div>
+      {/* 2. SECTION: AI TOOLS (2-Column Rounded Cards with Badges) */}
+      <section id="home-ai-tools-section" className="w-full">
+        <h2 className="text-[15px] sm:text-base font-bold text-slate-900 tracking-tight mb-2.5">
+          AI Tools
+        </h2>
 
-        {/* Stat 2: Tools Available */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3 sm:p-5 shadow-xs flex flex-col items-center sm:items-start text-center sm:text-left transition-all hover:border-slate-300">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            Tools Digunakan
-          </span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-lg sm:text-2xl font-black text-slate-900">
-              {popularTools.length + allAiTools.length}
-            </span>
-            <span className="text-xs sm:text-sm text-blue-600 font-bold">Tools</span>
-          </div>
-          <span className="text-[10px] text-slate-400 mt-1 hidden sm:inline">
-            Siap digunakan kapan saja
-          </span>
-        </div>
-
-        {/* Stat 3: Premium Status */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-3 sm:p-5 shadow-xs flex flex-col items-center sm:items-start text-center sm:text-left transition-all hover:border-slate-300">
-          <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            Premium Status
-          </span>
-          <div className="flex items-center gap-1.5">
-            {chatQuota?.isPremium ? (
-              <span className="text-xs sm:text-base font-extrabold text-amber-600 flex items-center gap-1">
-                <Crown className="w-3.5 h-3.5 text-amber-500" />
-                <span>PRO</span>
-              </span>
-            ) : (
-              <span className="text-xs sm:text-base font-extrabold text-slate-700">
-                STARTER
-              </span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => onNavigate && onNavigate('premium')}
-            className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold mt-1 hidden sm:inline text-left cursor-pointer"
-          >
-            {chatQuota?.isPremium ? 'Lihat Manfaat →' : 'Upgrade ke PRO →'}
-          </button>
-        </div>
-      </section>
-
-      {/* 3. MULTIMODAL VISION AI DROPZONE CARD */}
-      <section
-        id="home-vision-dropzone"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={`w-full p-4 sm:p-6 rounded-3xl border-2 border-dashed transition-all cursor-pointer group ${
-          isDragging
-            ? 'border-blue-600 bg-blue-50/50 scale-[1.01]'
-            : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/50 shadow-xs'
-        }`}
-      >
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <div className="flex flex-col sm:flex-row items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <UploadCloud className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center justify-center sm:justify-start gap-2">
-                <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                  Analisis Visual & Screenshot Postingan
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white">
-                  VISION AI
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Tarik gambar ke sini atau klik untuk mengunggah screenshot (PNG, JPG, WEBP maks 10 MB)
-              </p>
-            </div>
-          </div>
-          <div className="px-4 py-2 rounded-xl bg-slate-100 group-hover:bg-blue-50 text-slate-700 group-hover:text-blue-700 text-xs font-semibold transition-colors shrink-0">
-            Pilih Gambar
-          </div>
-        </div>
-      </section>
-
-      {/* 4. TOOLS POPULER SECTION */}
-      <section id="home-popular-tools" className="w-full space-y-3.5">
-        <div className="flex items-center justify-between px-1">
-          <div>
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-              Tools Populer
-            </h2>
-            <p className="text-xs text-slate-500">
-              Fitur favorit kreator untuk memproduksi konten berefek viral
-            </p>
-          </div>
-          <span className="text-[11px] font-bold text-blue-600">Terbanyak Digunakan</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {popularTools.map((tool) => {
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          {primaryAiTools.map((tool) => {
             const Icon = tool.icon;
             return (
               <div
                 key={tool.id}
-                id={`popular-tool-card-${tool.id}`}
+                id={`card-${tool.id}`}
                 onClick={tool.action}
-                className="group bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-5 shadow-xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between cursor-pointer"
+                className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-100/95 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-blue-200 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.99]"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <Icon className="w-5 h-5" />
+                  {/* Top Row: Icon + Badge */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-800 group-hover:text-blue-600 transition-colors">
+                      <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5" strokeWidth={2} />
                     </div>
+
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tool.badgeColor}`}
+                      className={`text-[9.5px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        tool.badgeType === 'amber'
+                          ? 'bg-[#FEF3C7] text-[#B45309]'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
                     >
                       {tool.badge}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-600 transition-colors">
+
+                  {/* Title */}
+                  <h3 className="font-bold text-slate-900 text-[12.5px] sm:text-[13.5px] leading-tight group-hover:text-blue-600 transition-colors">
                     {tool.title}
                   </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed mt-1 line-clamp-2">
+
+                  {/* Description */}
+                  <p className="text-[10.5px] sm:text-[11.5px] text-slate-500 leading-snug mt-1 line-clamp-2">
                     {tool.desc}
                   </p>
-                </div>
-
-                <div className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-600 group-hover:text-blue-600 transition-colors">
-                  <span>Gunakan Sekarang</span>
-                  <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             );
@@ -454,125 +300,184 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         </div>
       </section>
 
-      {/* 5. ALL AI TOOLS GRID */}
-      <section id="home-all-tools" className="w-full space-y-3.5">
-        <div className="flex items-center justify-between px-1">
-          <div>
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-              AI Tools Tambahan
-            </h2>
-            <p className="text-xs text-slate-500">
-              Manajemen editorial, kurasi hashtag, dan arsip riwayat karya Anda
-            </p>
+      {/* 3. SECTION: TOOLS POPULER (Bento Cards with Miniature Tech Graphic) */}
+      <section id="home-popular-tools-section" className="w-full">
+        <h2 className="text-[15px] sm:text-base font-bold text-slate-900 tracking-tight mb-2.5">
+          Tools Populer
+        </h2>
+
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          {/* Bento Card 1: AI Content Generator */}
+          <div
+            id="popular-card-content-gen"
+            onClick={() => {
+              if (onNavigate) {
+                onNavigate('chat');
+              } else if (onSelectPrompt) {
+                onSelectPrompt('Buatkan naskah video pendek viral untuk media sosial.');
+              }
+            }}
+            className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-100/95 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-blue-200 transition-all cursor-pointer relative overflow-hidden group active:scale-[0.99]"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <AppLogo type="header" size={19} variant="dark" />
+              <span className="text-[9.5px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309]">
+                Popular
+              </span>
+            </div>
+
+            <div className="flex items-end justify-between mt-1">
+              <h3 className="font-bold text-slate-900 text-[12.5px] sm:text-[13.5px] leading-tight group-hover:text-blue-600 transition-colors">
+                AI Content<br />Generator
+              </h3>
+              <TechArtBlob size={58} mini className="-mr-1 -mb-1 opacity-95 group-hover:scale-105 transition-transform" />
+            </div>
+          </div>
+
+          {/* Bento Card 2: AI Thumbnail Generator */}
+          <div
+            id="popular-card-thumb-gen"
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-100/95 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:border-blue-200 transition-all cursor-pointer relative overflow-hidden group active:scale-[0.99]"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <AppLogo type="header" size={19} variant="dark" />
+              <span className="text-[9.5px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309]">
+                Popular
+              </span>
+            </div>
+
+            <div className="flex items-end justify-between mt-1">
+              <h3 className="font-bold text-slate-900 text-[12.5px] sm:text-[13.5px] leading-tight group-hover:text-blue-600 transition-colors">
+                AI Thumbnail<br />Generator
+              </h3>
+              <TechArtBlob size={58} mini className="-mr-1 -mb-1 opacity-95 group-hover:scale-105 transition-transform" />
+            </div>
           </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {allAiTools.map((tool) => {
-            const Icon = tool.icon;
-            return (
-              <div
-                key={tool.id}
-                id={`ai-tool-card-${tool.id}`}
-                onClick={() => onNavigate && onNavigate(tool.view)}
-                className="group bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 shadow-xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between cursor-pointer"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <Icon className="w-4.5 h-4.5" />
+      {/* 4. SECTION: UNLOCK ARVIN STUDIO PRO */}
+      <section
+        id="home-unlock-pro-card"
+        className="w-full bg-white rounded-2xl p-4 sm:p-5 border border-slate-100/95 shadow-[0_2px_8px_rgba(0,0,0,0.03)] relative overflow-hidden"
+      >
+        {/* Subtle Watermark Glow */}
+        <div
+          aria-hidden="true"
+          className="absolute -right-6 -bottom-6 opacity-[0.08] pointer-events-none"
+        >
+          <TechArtBlob size={180} />
+        </div>
+
+        <div className="relative z-10">
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight mb-2">
+            Unlock ARVIN STUDIO PRO
+          </h3>
+
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11.5px] sm:text-xs text-slate-700">
+            <span className="flex items-center gap-1.5">• Akses semua tools</span>
+            <span className="flex items-center gap-1.5">• Prioritas support</span>
+            <span className="flex items-center gap-1.5">• Fitur eksklusif</span>
+            <span className="flex items-center gap-1.5">• Tanpa batasan penggunaan</span>
+          </div>
+
+          <button
+            id="btn-home-upgrade-pro"
+            type="button"
+            onClick={() => onNavigate && onNavigate('premium')}
+            className="mt-3.5 px-4 py-2 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-98 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer inline-block"
+          >
+            Upgrade Premium
+          </button>
+        </div>
+      </section>
+
+      {/* 5. STATS CARD (Footer Summary Bar - Real Data) */}
+      <section
+        id="home-stats-bar"
+        className="w-full bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-100/95 shadow-[0_1px_3px_rgba(0,0,0,0.02)] grid grid-cols-3 gap-2"
+      >
+        {/* Col 1: AI Uses Today */}
+        <div className="flex flex-col">
+          <span className="text-[10.5px] sm:text-[11px] text-slate-500 font-medium">
+            AI Uses Today:
+          </span>
+          <span className="text-xs sm:text-sm font-bold text-slate-900 mt-0.5">
+            {chatQuota ? `${chatQuota.count} / ${chatQuota.isPremium ? '∞' : chatQuota.limit}` : '0 / 3'}
+          </span>
+        </div>
+
+        {/* Col 2: Tools Used */}
+        <div className="flex flex-col">
+          <span className="text-[10.5px] sm:text-[11px] text-slate-500 font-medium">
+            Tools Used:
+          </span>
+          <span className="text-xs sm:text-sm font-bold text-slate-900 mt-0.5">
+            {primaryAiTools.length + secondaryTools.length} Tools
+          </span>
+        </div>
+
+        {/* Col 3: Premium Status */}
+        <div className="flex flex-col">
+          <span className="text-[10.5px] sm:text-[11px] text-slate-500 font-medium">
+            Premium Status:
+          </span>
+          <button
+            type="button"
+            onClick={() => onNavigate && onNavigate('premium')}
+            className="text-xs sm:text-sm font-bold text-left cursor-pointer mt-0.5 hover:underline text-slate-900"
+          >
+            {chatQuota?.isPremium ? (
+              <span className="text-blue-600 font-extrabold">PRO (Active)</span>
+            ) : (
+              <span>Starter</span>
+            )}
+          </button>
+        </div>
+      </section>
+
+      {/* 6. EXPANDABLE ALL CREATOR TOOLS (Preserving 100% Functionality) */}
+      <div className="w-full pt-1">
+        <button
+          type="button"
+          onClick={() => setShowMoreTools(!showMoreTools)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-100/70 hover:bg-slate-100 text-slate-600 text-xs font-semibold transition-colors cursor-pointer"
+        >
+          <span>Semua AI Creator Tools Lengkap ({secondaryTools.length})</span>
+          {showMoreTools ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showMoreTools && (
+          <div className="grid grid-cols-2 gap-2 mt-2.5 animate-fadeIn">
+            {secondaryTools.map((tool) => {
+              const Icon = tool.icon;
+              return (
+                <div
+                  key={tool.id}
+                  onClick={() => onNavigate && onNavigate(tool.view)}
+                  className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs hover:border-blue-300 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Icon className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
                       {tool.badge}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
+                  <h4 className="font-bold text-slate-900 text-xs group-hover:text-blue-600 transition-colors">
                     {tool.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                  </h4>
+                  <p className="text-[10px] text-slate-500 leading-snug mt-0.5 line-clamp-2">
                     {tool.desc}
                   </p>
                 </div>
-                <div className="pt-3 mt-2 flex items-center gap-1 text-[11px] font-semibold text-slate-400 group-hover:text-blue-600 transition-colors">
-                  <span>Buka tool</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 6. QUICK PROMPTS CHIPS */}
-      <section id="home-quick-prompts" className="w-full space-y-2.5">
-        <div className="px-1">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Inspirasi Diskusi Cepat
-          </span>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          {quickPrompts.map((item, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectPrompt && onSelectPrompt(item.prompt)}
-              className="flex-1 px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/30 text-left text-xs font-medium text-slate-700 shadow-2xs transition-all cursor-pointer flex items-center justify-between gap-2 group"
-            >
-              <span>{item.label}</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* 7. PREMIUM BANNER (Clean, Non-Pushy, High-End SaaS) */}
-      <section
-        id="home-premium-banner"
-        className="w-full bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white rounded-3xl p-6 sm:p-8 lg:p-10 shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6"
-      >
-        {/* Subtle glow art */}
-        <div
-          aria-hidden="true"
-          className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"
-        />
-
-        <div className="space-y-2 text-center sm:text-left relative z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-bold tracking-wide border border-white/10">
-            <Crown className="w-3.5 h-3.5" />
-            <span>ARVIN STUDIO PRO</span>
+              );
+            })}
           </div>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight">
-            Unlock ARVIN STUDIO PRO
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-lg leading-relaxed">
-            Akses tak terbatas untuk Chat AI, Script Maker, Content Analyzer, dan semua AI Creator
-            Tools tanpa limit harian.
-          </p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-xs text-slate-300 justify-center sm:justify-start">
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              Tanpa Batas Harian
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              Prioritas Pemrosesan
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              Badge Kreator Eksklusif
-            </span>
-          </div>
-        </div>
-
-        <button
-          id="btn-home-upgrade-premium"
-          type="button"
-          onClick={() => onNavigate && onNavigate('premium')}
-          className="relative z-10 px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/30 transition-all shrink-0 cursor-pointer active:scale-98"
-        >
-          Upgrade Premium
-        </button>
-      </section>
+        )}
+      </div>
     </div>
   );
 };

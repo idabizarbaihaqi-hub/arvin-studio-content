@@ -21,10 +21,16 @@ export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
     category: 'UTAMA',
     items: [
       {
+        id: 'home',
+        label: 'Beranda Studio',
+        iconName: '🏠',
+        badge: '',
+      },
+      {
         id: 'new-chat',
-        label: 'Chat Baru & Vision',
-        iconName: '💬',
-        badge: 'Aktif',
+        label: 'Buat Konten AI',
+        iconName: '✨',
+        badge: 'Chat',
       },
     ],
   },
@@ -126,6 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="space-y-1">
                 {group.items.map((item) => {
+                  const isHome = item.id === 'home';
                   const isNewChat = item.id === 'new-chat';
                   const isContentAnalyzer = item.id === 'content-analyzer';
                   const isContentIdeas = item.id === 'content-ideas';
@@ -143,6 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const isSettings = item.id === 'settings';
 
                   const isActive =
+                    (isHome && activeView === 'home') ||
                     (isNewChat && activeView === 'chat') ||
                     (isContentAnalyzer && activeView === 'content-analyzer') ||
                     (isContentIdeas && activeView === 'content-ideas') ||
@@ -165,7 +173,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       id={`sidebar-item-${item.id}`}
                       type="button"
                       onClick={() => {
-                        if (isNewChat) {
+                        if (isHome) {
+                          onSelectView('home');
+                          onClose();
+                        } else if (isNewChat) {
                           onSelectView('chat');
                           onClose();
                         } else if (isContentAnalyzer) {

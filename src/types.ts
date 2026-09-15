@@ -34,6 +34,7 @@ export interface AiDailyUsageRecord {
 }
 
 export type SidebarMenuItemId =
+  | 'home'
   | 'new-chat'
   | 'content-analyzer'
   | 'content-ideas'
@@ -161,6 +162,7 @@ export interface GenerateIdeasParams {
 }
 
 export type ActiveView =
+  | 'home'
   | 'chat'
   | 'content-analyzer'
   | 'content-ideas'
