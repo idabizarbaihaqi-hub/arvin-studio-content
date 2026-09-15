@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, AtSign, ArrowRight, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
-import { AsLogo } from './AsLogo';
+import { User, Mail, Lock, AtSign, ArrowRight, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { registerWithEmail } from '../services/accessControlService';
 import { UserProfile } from '../types';
 
@@ -24,24 +24,23 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!fullName.trim()) {
-      setError('Silakan masukkan Nama Lengkap Anda.');
+    if (!fullName.trim() || !username.trim() || !email.trim() || !password) {
+      setError('Harap isi semua kolom formulir.');
       return;
     }
-    if (!username.trim()) {
-      setError('Silakan masukkan Username Anda.');
+
+    if (username.length < 3) {
+      setError('Username minimal 3 karakter.');
       return;
     }
-    if (!email.trim()) {
-      setError('Silakan masukkan Alamat Email Anda.');
-      return;
-    }
+
     if (password.length < 6) {
-      setError('Password minimal harus 6 karakter.');
+      setError('Password minimal 6 karakter.');
       return;
     }
+
     if (password !== confirmPassword) {
-      setError('Konfirmasi Password tidak sesuai dengan Password.');
+      setError('Konfirmasi password tidak cocok.');
       return;
     }
 
@@ -68,17 +67,22 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   };
 
   return (
-    <div id="register-view" className="min-h-screen bg-slate-50 flex items-center justify-center p-4 py-8">
-      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/90 shadow-xl p-6 sm:p-8 space-y-6 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
+    <div id="register-view" className="min-h-screen bg-slate-50/70 flex items-center justify-center p-4 py-8">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-6 sm:p-8 space-y-6 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
         {/* Logo & Branding */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto shadow-md">
-            <AsLogo className="w-8 h-8" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/25 p-2.5">
+            <AppLogo type="header" size={28} variant="light" className="w-full h-full text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 pt-1">
-            Buat Akun Kreator
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 pt-1">
+              Buat Akun Kreator
+            </h1>
+            <p className="text-[10px] font-bold tracking-[0.2em] text-blue-600 uppercase mt-0.5">
+              BY. ARVIN ERLANGGA
+            </p>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 pt-1">
             Daftar ke ARVIN STUDIO dan mulai berkarya dengan AI
           </p>
         </div>
@@ -108,7 +112,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Nama Lengkap Anda"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -128,7 +132,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ''))}
                 placeholder="username_kreator"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -149,7 +153,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nama@email.com"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -170,7 +174,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -191,7 +195,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -200,7 +204,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
             id="btn-submit-register"
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:bg-blue-400 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
           >
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -221,7 +225,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               id="link-go-to-login"
               type="button"
               onClick={onNavigateToLogin}
-              className="font-bold text-slate-900 hover:underline cursor-pointer"
+              className="font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
             >
               Masuk
             </button>
@@ -231,7 +235,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
         {/* Security badge */}
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Akun dibuat aman dengan Firebase Auth & Firestore Rules</span>
+          <span>Akun aman dengan Firebase Auth</span>
         </div>
       </div>
     </div>

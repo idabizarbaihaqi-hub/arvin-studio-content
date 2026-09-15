@@ -198,7 +198,7 @@ export const ContentAnalyzer: React.FC<ContentAnalyzerProps> = ({ onBackToChat, 
   return (
     <div
       id="content-analyzer-page"
-      className="w-full max-w-3xl mx-auto flex-1 flex flex-col px-3 sm:px-6 py-4 sm:py-6 overflow-y-auto"
+      className="w-full max-w-3xl mx-auto flex-1 flex flex-col px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-8 overflow-y-auto"
     >
       {/* Top Banner & Title */}
       <div className="mb-5 sm:mb-6">

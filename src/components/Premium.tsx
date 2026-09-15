@@ -336,7 +336,7 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
   const daysRemaining = isPremiumActive ? getDaysRemaining(profile?.subscriptionExpiry) : null;
 
   return (
-    <div id="premium-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+    <div id="premium-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Top Header */}
         <div className="flex items-center justify-between">

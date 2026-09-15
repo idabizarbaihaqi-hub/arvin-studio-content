@@ -1,6 +1,5 @@
 import React from 'react';
-import { X, MessageSquare, ChevronRight } from 'lucide-react';
-import { AsLogo } from './AsLogo';
+import { X, ChevronRight } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { MenuGroup, MenuItem, ActiveView } from '../types';
 
@@ -23,7 +22,7 @@ export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
     items: [
       {
         id: 'new-chat',
-        label: 'Chat Baru',
+        label: 'Chat Baru & Vision',
         iconName: '💬',
         badge: 'Aktif',
       },
@@ -32,30 +31,30 @@ export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
   {
     category: 'AI CREATOR TOOLS',
     items: [
-      { id: 'content-analyzer', label: 'Content Analyzer', iconName: '📊', badge: 'Aktif' },
-      { id: 'content-ideas', label: 'Content Ideas', iconName: '💡', badge: 'Aktif' },
-      { id: 'caption-maker', label: 'Caption Maker', iconName: '✍️', badge: 'Aktif' },
-      { id: 'hook-generator', label: 'Hook Generator', iconName: '🔥', badge: 'Aktif' },
-      { id: 'script-maker', label: 'Script Maker', iconName: '🎬', badge: 'Aktif' },
-      { id: 'hashtag-generator', label: 'Hashtag Generator', iconName: '#️⃣', badge: 'Aktif' },
+      { id: 'content-analyzer', label: 'Content Analyzer', iconName: '📊', badge: 'Insight' },
+      { id: 'content-ideas', label: 'Content Ideas', iconName: '💡', badge: 'Kreatif' },
+      { id: 'caption-maker', label: 'Caption Maker', iconName: '✍️', badge: 'Viral' },
+      { id: 'hook-generator', label: 'Hook Generator', iconName: '🔥', badge: 'Retensi' },
+      { id: 'script-maker', label: 'Script Maker', iconName: '🎬', badge: 'Naskah' },
+      { id: 'hashtag-generator', label: 'Hashtag Generator', iconName: '#️⃣', badge: 'Tagar' },
     ],
   },
   {
     category: 'MANAGEMENT',
     items: [
-      { id: 'content-planner', label: 'Content Planner', iconName: '📅', badge: 'Aktif' },
-      { id: 'analytics', label: 'Analytics', iconName: '📈', badge: 'Aktif' },
-      { id: 'history', label: 'History', iconName: '🕘', badge: 'Aktif' },
+      { id: 'content-planner', label: 'Content Planner', iconName: '📅', badge: 'PRO' },
+      { id: 'analytics', label: 'Analytics', iconName: '📈', badge: 'PRO' },
+      { id: 'history', label: 'Riwayat Ekspor', iconName: '🕘', badge: 'Arsip' },
     ],
   },
   {
-    category: 'ACCOUNT',
+    category: 'ACCOUNT & BILLING',
     items: [
-      { id: 'account', label: 'Dashboard Akun', iconName: '📱', badge: 'Aktif' },
-      { id: 'profile', label: 'Profile', iconName: '👤', badge: 'Aktif' },
-      { id: 'premium', label: 'Premium', iconName: '⭐', badge: 'Aktif' },
-      { id: 'credits', label: 'Credits', iconName: '💳', badge: 'Aktif' },
-      { id: 'settings', label: 'Settings', iconName: '⚙️', badge: 'Aktif' },
+      { id: 'account', label: 'Dashboard Akun', iconName: '📱', badge: 'Profil' },
+      { id: 'profile', label: 'Edit Profil', iconName: '👤', badge: '' },
+      { id: 'premium', label: 'Upgrade PRO', iconName: '⭐', badge: 'PRO' },
+      { id: 'credits', label: 'Credits & Kuota', iconName: '💳', badge: '' },
+      { id: 'settings', label: 'Pengaturan', iconName: '⚙️', badge: '' },
     ],
   },
 ];
@@ -77,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Backdrop overlay */}
       <div
         id="sidebar-backdrop"
-        className={`fixed inset-0 z-40 bg-neutral-950/40 backdrop-blur-xs transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -87,22 +86,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Drawer */}
       <aside
         id="app-sidebar"
-        className={`fixed top-0 bottom-0 left-0 z-50 w-[280px] sm:w-[300px] max-w-[85vw] bg-white border-r border-slate-200 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-[285px] sm:w-[310px] max-w-[85vw] bg-white border-r border-slate-200/90 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-900 rounded-xl flex items-center justify-center shadow-md shadow-slate-300 shrink-0 overflow-hidden p-1.5">
-              <AppLogo type="header" size={24} variant="light" className="w-full h-full" />
+            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-blue-500 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 overflow-hidden p-2">
+              <AppLogo type="header" size={24} variant="light" className="w-full h-full text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold tracking-tight text-slate-900 text-base leading-tight">
+              <span className="font-extrabold tracking-tight text-slate-900 text-base leading-tight">
                 ARVIN STUDIO
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Workspace
+              <span className="text-[9px] font-bold tracking-[0.16em] text-blue-600 uppercase mt-0.5">
+                BY. ARVIN ERLANGGA
               </span>
             </div>
           </div>
@@ -111,17 +110,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Tutup Navigasi"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4.5 h-4.5" />
           </button>
         </div>
 
         {/* Scrollable Navigation Menu List */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+        <div className="flex-1 overflow-y-auto px-3.5 py-4 space-y-5">
           {SIDEBAR_MENU_GROUPS.map((group) => (
             <div key={group.category} className="space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] px-3 mb-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] px-2.5 mb-1.5">
                 {group.category}
               </p>
 
@@ -215,13 +214,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           onSelectFeaturePlaceholder(item);
                         }
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all text-left cursor-pointer ${
                         isActive
-                          ? 'bg-slate-900 text-white shadow-md shadow-slate-900/15'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 font-semibold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span className="text-base shrink-0 select-none">
                           {item.iconName}
                         </span>
@@ -230,16 +229,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                       {item.badge ? (
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                             isActive
-                              ? 'bg-slate-800 text-slate-200'
-                              : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                              ? 'bg-white/20 text-white'
+                              : 'bg-blue-50 text-blue-700 border border-blue-100'
                           }`}
                         >
                           {item.badge}
                         </span>
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                        <ChevronRight
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isActive ? 'text-white/70' : 'text-slate-300'
+                          }`}
+                        />
                       )}
                     </button>
                   );
@@ -251,7 +254,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Super Admin Special Entry */}
           {isSuperAdmin && (
             <div className="pt-2 px-1">
-              <div className="px-3 pb-1.5 text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+              <div className="px-2.5 pb-1.5 text-[10px] font-bold text-amber-700 uppercase tracking-wider">
                 ADMINISTRASI SISTEM
               </div>
               <button
@@ -274,14 +277,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer Credit & Status Panel */}
-        <div className="p-4 border-t border-slate-100 shrink-0">
+        <div className="p-3.5 border-t border-slate-100 shrink-0 bg-white">
           <button
             type="button"
             onClick={() => {
               onSelectView('account');
               onClose();
             }}
-            className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-2xl p-3 flex items-center gap-3 transition-colors text-left cursor-pointer"
+            className="w-full bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 rounded-2xl p-2.5 flex items-center gap-3 transition-colors text-left cursor-pointer"
           >
             {userPhotoURL ? (
               <img
@@ -291,7 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
               />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                 {userName ? userName.slice(0, 2).toUpperCase() : 'AS'}
               </div>
             )}
@@ -299,7 +302,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-xs font-bold truncate text-slate-900">
                 {userName || 'Kreator ARVIN'}
               </p>
-              <p className="text-[10px] text-slate-500 font-medium">
+              <p className="text-[10px] text-blue-600 font-semibold">
                 {isSuperAdmin ? 'Super Administrator' : 'Akun Kreator • Kelola'}
               </p>
             </div>

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ArrowUp, Image as ImageIcon, X, Paperclip } from 'lucide-react';
+import { ArrowUp, Image as ImageIcon, X } from 'lucide-react';
 import { ChatImageAttachment } from '../types';
 
 interface ChatInputProps {
@@ -68,7 +68,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     if (file) {
       processImageFile(file);
     }
-    // reset input so same file can be chosen again if removed
     e.target.value = '';
   };
 
@@ -137,17 +136,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <div
       id="chat-input-container"
-      className="w-full px-3 sm:px-8 pt-2 pb-3 sm:pb-5 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/95 to-transparent shrink-0 sticky bottom-0 z-10"
+      className="w-full px-3 sm:px-8 pt-2 pb-20 sm:pb-5 bg-gradient-to-t from-white via-white/95 to-transparent shrink-0 sticky bottom-0 z-10"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <form
         onSubmit={handleSubmit}
-        className={`max-w-3xl mx-auto relative flex flex-col bg-white border rounded-[26px] p-2 pl-3 sm:pl-4 pr-2 sm:pr-2.5 shadow-lg transition-all ${
+        className={`max-w-3xl mx-auto relative flex flex-col bg-white border rounded-2xl sm:rounded-3xl p-2 pl-3 sm:pl-4 pr-2 sm:pr-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.04)] transition-all ${
           isDragging
-            ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/20'
-            : 'border-slate-200 shadow-slate-200/60 focus-within:ring-2 focus-within:ring-slate-900/10 focus-within:border-slate-300'
+            ? 'border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/20'
+            : 'border-slate-200/90 focus-within:ring-2 focus-within:ring-blue-500/15 focus-within:border-blue-500'
         }`}
       >
         {/* Hidden File Input for Image Upload */}
@@ -161,17 +160,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Attached Image Preview Chip */}
         {attachedImage && (
-          <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 pr-3 mb-2 max-w-fit animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl p-1.5 pr-3 mb-2 max-w-fit animate-in fade-in duration-150">
             <img
               src={attachedImage.data}
               alt="Preview"
-              className="w-10 h-10 object-cover rounded-xl border border-slate-200 bg-white"
+              className="w-10 h-10 object-cover rounded-lg border border-blue-200 bg-white"
             />
             <div className="flex flex-col min-w-0 pr-1">
               <span className="text-xs font-semibold text-slate-800 truncate max-w-[180px] sm:max-w-[240px]">
                 {attachedImage.name || 'Screenshot terlampir'}
               </span>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-blue-700 font-medium">
                 {formatFileSize(attachedImage.sizeBytes)} • Siap dianalisis
               </span>
             </div>
@@ -180,7 +179,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 type="button"
                 onClick={() => onAttachImage(null)}
                 aria-label="Hapus gambar"
-                className="w-6 h-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                className="w-6 h-6 rounded-full hover:bg-blue-200/70 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer ml-1"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -197,9 +196,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={isLoading}
             title="Unggah Gambar atau Screenshot (Gemini Vision)"
             aria-label="Unggah Gambar"
-            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer mb-0.5"
+            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer mb-0.5"
           >
-            <ImageIcon className="w-5 h-5 stroke-[1.75]" />
+            <ImageIcon className="w-5 h-5 stroke-[1.8]" />
           </button>
 
           <textarea
@@ -233,9 +232,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={!canSend}
             title="Kirim pesan"
             aria-label="Kirim pesan"
-            className={`shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center transition-all ${
+            className={`shrink-0 w-10 h-10 sm:w-10.5 sm:h-10.5 rounded-xl flex items-center justify-center transition-all ${
               canSend
-                ? 'bg-slate-900 hover:scale-105 active:scale-95 text-white cursor-pointer shadow-md shadow-slate-900/20'
+                ? 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white cursor-pointer shadow-md shadow-blue-500/25'
                 : 'bg-slate-100 text-slate-300 cursor-not-allowed'
             }`}
           >
@@ -244,12 +243,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       </form>
 
-      <div className="mt-2 sm:mt-2.5 flex flex-wrap justify-center items-center gap-2.5 sm:gap-5 text-[10px] text-slate-400 uppercase tracking-widest text-center">
+      <div className="mt-2 sm:mt-2.5 flex flex-wrap justify-center items-center gap-2 sm:gap-4 text-[10px] text-slate-400 font-medium tracking-wider uppercase text-center">
         <span>Enter kirim</span>
         <span>•</span>
         <span>Shift + Enter baris baru</span>
         <span className="hidden sm:inline">•</span>
-        <span className="hidden sm:inline">Bisa paste screenshot langsung (Ctrl+V)</span>
+        <span className="hidden sm:inline">Paste screenshot (Ctrl+V)</span>
       </div>
     </div>
   );

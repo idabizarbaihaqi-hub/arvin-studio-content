@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowRight, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
-import { AsLogo } from './AsLogo';
+import { Mail, Lock, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { AppLogo } from './AppLogo';
 import { loginWithEmail } from '../services/accessControlService';
 import { UserProfile } from '../types';
 
@@ -50,17 +50,22 @@ export const LoginView: React.FC<LoginViewProps> = ({
   };
 
   return (
-    <div id="login-view" className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/90 shadow-xl p-6 sm:p-8 space-y-6 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
+    <div id="login-view" className="min-h-screen bg-slate-50/70 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-200/80 shadow-[0_4px_24px_rgba(0,0,0,0.06)] p-6 sm:p-8 space-y-6 text-slate-900 animate-in fade-in zoom-in-95 duration-200">
         {/* Logo & Branding */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center mx-auto shadow-md">
-            <AsLogo className="w-8 h-8" />
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/25 p-2.5">
+            <AppLogo type="header" size={28} variant="light" className="w-full h-full text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 pt-1">
-            ARVIN STUDIO
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 pt-1">
+              ARVIN STUDIO
+            </h1>
+            <p className="text-[10px] font-bold tracking-[0.2em] text-blue-600 uppercase mt-0.5">
+              BY. ARVIN ERLANGGA
+            </p>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 pt-1">
             Masuk ke AI Workspace Kreator Konten Anda
           </p>
         </div>
@@ -91,7 +96,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nama@email.com"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
@@ -103,11 +108,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </label>
               <button
                 type="button"
-                id="link-forgot-password"
                 onClick={onNavigateToForgotPassword}
-                className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
               >
-                Lupa password?
+                Lupa Password?
               </button>
             </div>
             <div className="relative">
@@ -122,47 +126,43 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-colors"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
 
           <button
-            id="btn-submit-login"
+            id="btn-login-submit"
             type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer"
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-sm font-bold rounded-xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {loading ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Memproses Masuk...</span>
+              </>
             ) : (
               <>
-                <span>Masuk</span>
+                <span>Masuk Sekarang</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
 
-        {/* Register Link */}
-        <div className="pt-4 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-500">
+        {/* Footer info & register link */}
+        <div className="pt-2 text-center text-xs text-slate-500 border-t border-slate-100 space-y-2">
+          <p>
             Belum punya akun?{' '}
             <button
-              id="link-go-to-register"
               type="button"
               onClick={onNavigateToRegister}
-              className="font-bold text-slate-900 hover:underline cursor-pointer"
+              className="font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
             >
-              Daftar Sekarang
+              Daftar Gratis
             </button>
           </p>
-        </div>
-
-        {/* Firebase Authentication Security Footer */}
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 text-center">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Autentikasi Firebase Email & Password Terlindungi</span>
         </div>
       </div>
     </div>

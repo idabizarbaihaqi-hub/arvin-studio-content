@@ -17,6 +17,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         (request.auth.token.email != null && (
           request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.sangabizar@gmail.com' ||
           request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
         )) ||
         request.auth.token.superAdmin == true ||
@@ -33,6 +34,7 @@ service cloud.firestore {
       allow create: if isOwner(userId) && (
         (request.auth.token.email != null && (
           request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.sangabizar@gmail.com' ||
           request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
         ) && request.resource.data.role == 'SUPER_ADMIN') ||
         (request.resource.data.role == 'USER' && request.resource.data.plan == 'FREE' && request.resource.data.subscriptionStatus == 'INACTIVE')
@@ -47,6 +49,7 @@ service cloud.firestore {
       // Primary Super Admins cannot be deleted
       allow delete: if isSuperAdmin() && 
         resource.data.email != 'id.abizarbaihaqi@gmail.com' &&
+        resource.data.email != 'id.sangabizar@gmail.com' &&
         resource.data.email != 'id.agnesyakartika@gmail.com';
     }
 
@@ -146,6 +149,7 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || (
         isAuthenticated() && request.auth.token.email != null && (
           request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.sangabizar@gmail.com' ||
           request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
         )
       );
@@ -159,6 +163,7 @@ service cloud.firestore {
       allow write: if isSuperAdmin() || (
         isAuthenticated() && request.auth.token.email != null && (
           request.auth.token.email.lower() == 'id.abizarbaihaqi@gmail.com' ||
+          request.auth.token.email.lower() == 'id.sangabizar@gmail.com' ||
           request.auth.token.email.lower() == 'id.agnesyakartika@gmail.com'
         )
       );

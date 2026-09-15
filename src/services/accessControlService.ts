@@ -43,6 +43,7 @@ export const AI_FEATURE_LABELS: Record<AiFeatureKey, string> = {
 
 export const SUPER_ADMIN_EMAILS = [
   'id.abizarbaihaqi@gmail.com',
+  'id.sangabizar@gmail.com',
   'id.agnesyakartika@gmail.com',
 ];
 export const PRIMARY_SUPER_ADMIN_EMAIL = 'id.abizarbaihaqi@gmail.com';

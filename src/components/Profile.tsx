@@ -103,7 +103,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack }) => {
   }
 
   return (
-    <div id="profile-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+    <div id="profile-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Navigation & Header */}
         <div className="flex items-center justify-between">

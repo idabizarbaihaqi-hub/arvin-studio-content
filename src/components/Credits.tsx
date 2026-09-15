@@ -133,7 +133,7 @@ export const Credits: React.FC<CreditsProps> = ({ onBack }) => {
   };
 
   return (
-    <div id="credits-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+    <div id="credits-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header & Back */}
         <div className="flex items-center justify-between">

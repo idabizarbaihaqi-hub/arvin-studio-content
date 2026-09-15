@@ -8,15 +8,12 @@ import {
   ArrowRight,
   ShieldCheck,
   RefreshCw,
-  ExternalLink,
-  Layers,
   Clock,
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
 import { ActiveView, AccountSummary } from '../types';
 import { getAccountSummary } from '../services/accessControlService';
-import { AsLogo } from './AsLogo';
 
 interface AccountDashboardProps {
   onNavigate: (view: ActiveView) => void;
@@ -58,8 +55,8 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
   if (loading && !data) {
     return (
       <div className="flex-1 p-6 flex flex-col items-center justify-center text-slate-400">
-        <RefreshCw className="w-6 h-6 animate-spin text-slate-600 mb-2" />
-        <span className="text-sm">Memuat informasi akun...</span>
+        <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mb-2" />
+        <span className="text-sm font-medium">Memuat informasi akun...</span>
       </div>
     );
   }
@@ -85,33 +82,33 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
   };
 
   return (
-    <div id="account-dashboard-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8">
+    <div id="account-dashboard-view" className="flex-1 overflow-y-auto bg-slate-50/50 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header toolbar */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               Dashboard Akun
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Pusat kendali profil kreator, status langganan, dan saldo kredit
+              Pusat kendali profil kreator, status langganan, dan pemakaian AI
             </p>
           </div>
           <button
             type="button"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-blue-300 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${refreshing ? 'animate-spin' : ''}`} />
             <span>Segarkan</span>
           </button>
         </div>
 
-        {/* Profile Card as specified in prompt section A */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 sm:p-8 relative overflow-hidden">
-          {/* Subtle decorative background glow */}
-          <div className="absolute -right-12 -top-12 w-48 h-48 bg-slate-100 rounded-full blur-3xl pointer-events-none" />
+        {/* Profile Card */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-6 sm:p-8 relative overflow-hidden">
+          {/* Subtle decorative glow */}
+          <div className="absolute -right-12 -top-12 w-48 h-48 bg-blue-50/80 rounded-full blur-3xl pointer-events-none" />
 
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 relative">
             {/* Profile Photo */}
@@ -120,15 +117,16 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                 <img
                   src={user.photoURL}
                   alt={user.displayName}
+                  referrerPolicy="no-referrer"
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-slate-200 shadow-sm"
                 />
               ) : (
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center font-bold text-2xl sm:text-3xl shadow-md border-2 border-slate-100">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-2xl sm:text-3xl shadow-md shadow-blue-500/20 border-2 border-white">
                   {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'A'}
                 </div>
               )}
               {isPremium && (
-                <div className="absolute -bottom-1 -right-1 p-1 bg-amber-500 text-white rounded-lg shadow-sm" title="Akun Premium">
+                <div className="absolute -bottom-1 -right-1 p-1.5 bg-amber-500 text-white rounded-xl shadow-sm ring-2 ring-white" title="Akun PRO">
                   <Crown className="w-3.5 h-3.5" />
                 </div>
               )}
@@ -141,7 +139,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                   {user?.displayName || 'Kreator ARVIN'}
                 </h2>
                 {user?.username && (
-                  <span className="text-xs sm:text-sm font-medium text-slate-400">
+                  <span className="text-xs sm:text-sm font-semibold text-blue-600">
                     @{user.username}
                   </span>
                 )}
@@ -152,7 +150,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               </p>
 
               {user?.bio && (
-                <p className="text-xs sm:text-sm text-slate-600 pt-1 max-w-lg">
+                <p className="text-xs sm:text-sm text-slate-600 pt-1 max-w-lg leading-relaxed">
                   {user.bio}
                 </p>
               )}
@@ -162,12 +160,12 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                 {isPremium ? (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
                     <Crown className="w-3.5 h-3.5 text-amber-600" />
-                    PREMIUM PLAN • {subscription?.plan}
+                    PREMIUM PRO • {subscription?.plan}
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                    <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
-                    FREE PLAN
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    STARTER FREE PLAN
                   </span>
                 )}
 
@@ -182,19 +180,19 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
 
             {/* Credits Display */}
             <div className="w-full sm:w-auto sm:border-l sm:border-slate-100 sm:pl-6 flex flex-col items-center sm:items-end justify-center pt-3 sm:pt-0 border-t border-slate-100 sm:border-t-0">
-              <span className="text-xs uppercase font-semibold tracking-wider text-slate-400">
+              <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
                 Credits
               </span>
               <div className="flex items-baseline gap-1 mt-0.5">
                 <span className="text-3xl sm:text-4xl font-black text-slate-900">
                   {credits}
                 </span>
-                <span className="text-xs font-medium text-slate-500">Kredit</span>
+                <span className="text-xs font-bold text-blue-600">Kredit</span>
               </div>
               <button
                 type="button"
                 onClick={() => onNavigate('credits')}
-                className="mt-2 text-xs font-semibold text-slate-700 hover:text-slate-900 underline underline-offset-2 flex items-center gap-1"
+                className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2 flex items-center gap-1 cursor-pointer"
               >
                 <span>Lihat Riwayat</span>
                 <ArrowRight className="w-3 h-3" />
@@ -207,7 +205,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
         {user?.role === 'SUPER_ADMIN' && onNavigateToAdmin && (
           <div
             id="super-admin-banner-card"
-            className="p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+            className="p-5 rounded-3xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs"
           >
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm font-black text-sm">
@@ -216,7 +214,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-slate-900">Hak Akses Super Administrator</h3>
-                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-200">
+                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
                     SUPER_ADMIN
                   </span>
                 </div>
@@ -240,7 +238,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
 
         {/* Quick Actions Grid */}
         <div>
-          <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 px-1">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">
             Menu Akun
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -249,12 +247,14 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               id="btn-quick-profile"
               type="button"
               onClick={() => onNavigate('profile')}
-              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all text-left group"
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-300 hover:shadow-md transition-all text-left group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <User className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-sm text-slate-900 mb-0.5">Edit Profile</h3>
+              <h3 className="font-bold text-sm text-slate-900 mb-0.5 group-hover:text-blue-600 transition-colors">
+                Edit Profil
+              </h3>
               <p className="text-xs text-slate-500 line-clamp-1">Nama, foto & bio</p>
             </button>
 
@@ -263,12 +263,14 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               id="btn-quick-premium"
               type="button"
               onClick={() => onNavigate('premium')}
-              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 hover:border-amber-300 hover:shadow-md transition-all text-left group"
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-amber-300 hover:shadow-md transition-all text-left group cursor-pointer"
             >
               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <Crown className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-sm text-slate-900 mb-0.5">Premium</h3>
+              <h3 className="font-bold text-sm text-slate-900 mb-0.5 group-hover:text-amber-600 transition-colors">
+                Upgrade PRO
+              </h3>
               <p className="text-xs text-slate-500 line-clamp-1">Paket & status aktif</p>
             </button>
 
@@ -277,12 +279,14 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               id="btn-quick-credits"
               type="button"
               onClick={() => onNavigate('credits')}
-              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 hover:border-blue-300 hover:shadow-md transition-all text-left group"
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-300 hover:shadow-md transition-all text-left group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <CreditCard className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-sm text-slate-900 mb-0.5">Credits</h3>
+              <h3 className="font-bold text-sm text-slate-900 mb-0.5 group-hover:text-indigo-600 transition-colors">
+                Credits
+              </h3>
               <p className="text-xs text-slate-500 line-clamp-1">Saldo & transaksi</p>
             </button>
 
@@ -291,19 +295,19 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               id="btn-quick-settings"
               type="button"
               onClick={() => onNavigate('settings')}
-              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 hover:shadow-md transition-all text-left group"
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all text-left group cursor-pointer"
             >
               <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <SettingsIcon className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-sm text-slate-900 mb-0.5">Settings</h3>
+              <h3 className="font-bold text-sm text-slate-900 mb-0.5">Pengaturan</h3>
               <p className="text-xs text-slate-500 line-clamp-1">Privasi, akun & opsi</p>
             </button>
           </div>
         </div>
 
         {/* Free Credit & Trial System (Chat AI 3x/day + Other AI Features 1x Lifetime Trial) */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 sm:p-6 space-y-6">
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 sm:p-6 space-y-6">
           {/* Section 1: Chat AI Daily Credits */}
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -311,16 +315,16 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-base">💬</span>
                   <h2 className="font-bold text-base text-slate-900">
-                    Chat AI (Halaman Awal)
+                    Chat AI & Vision (Halaman Awal)
                   </h2>
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200">
                     {isPremium ? 'PREMIUM UNLIMITED' : 'RESET HARIAN'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {isPremium
                     ? 'Akun Premium memiliki akses Chat AI tanpa batas.'
-                    : 'Akun FREE mendapatkan 3 free credit Chat AI setiap hari (reset pukul 00:00 WIB).'}
+                    : 'Akun Starter mendapatkan 3 free credit Chat AI setiap hari (reset pukul 00:00 WIB).'}
                 </p>
               </div>
               {isPremium ? (
@@ -353,7 +357,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                         ? 'bg-amber-100 text-amber-800 border border-amber-300'
                         : dailyUsage.chat.isExceeded
                         ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                        : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-blue-100 text-blue-800 border border-blue-200'
                     }`}
                   >
                     {isPremium
@@ -370,7 +374,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                           ? 'bg-rose-500'
                           : dailyUsage.chat.count > 1
                           ? 'bg-amber-500'
-                          : 'bg-emerald-600'
+                          : 'bg-blue-600'
                       }`}
                       style={{
                         width: `${Math.min(100, Math.round((dailyUsage.chat.count / 3) * 100))}%`,
@@ -404,16 +408,16 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-base">✨</span>
                   <h2 className="font-bold text-base text-slate-900">
-                    Fitur AI Lainnya (Trial 1x Seumur Hidup)
+                    Fitur AI Kreator (Trial 1x Seumur Hidup)
                   </h2>
-                  <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-200">
                     {isPremium ? 'PREMIUM UNLIMITED' : '1X TRIAL PER FITUR'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {isPremium
-                    ? 'Semua alat AI kreator terbuka tanpa batas untuk akun Premium.'
-                    : 'Setiap fitur AI di bawah ini memiliki 1x kesempatan trial gratis seumur hidup akun (tidak reset harian).'}
+                    ? 'Semua alat AI kreator terbuka tanpa batas untuk akun PRO.'
+                    : 'Setiap fitur AI di bawah ini memiliki 1x kesempatan trial gratis seumur hidup akun.'}
                 </p>
               </div>
             </div>
@@ -434,7 +438,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                             ? 'bg-slate-50/70 border-slate-100'
                             : isExceeded
                             ? 'bg-rose-50/40 border-rose-200/80'
-                            : 'bg-emerald-50/30 border-emerald-200/80'
+                            : 'bg-blue-50/30 border-blue-200/70'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
@@ -447,14 +451,14 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                                 ? 'bg-amber-100 text-amber-800'
                                 : isExceeded
                                 ? 'bg-rose-100 text-rose-700'
-                                : 'bg-emerald-100 text-emerald-800'
+                                : 'bg-blue-100 text-blue-800'
                             }`}
                           >
                             {isPremium
                               ? 'Unlimited'
                               : isExceeded
                               ? 'Trial Habis'
-                              : '1x Trial Gratis'}
+                              : '1x Trial'}
                           </span>
                         </div>
 
@@ -466,14 +470,14 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                                 ? 'text-amber-700'
                                 : isExceeded
                                 ? 'text-rose-600'
-                                : 'text-emerald-700'
+                                : 'text-blue-700'
                             }`}
                           >
                             {isPremium
                               ? 'Akses Bebas'
                               : isExceeded
-                              ? 'Khusus Premium'
-                              : 'Tersedia (1x)'}
+                              ? 'Khusus PRO'
+                              : 'Tersedia'}
                           </span>
                         </div>
                       </div>
@@ -484,22 +488,22 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
         </div>
 
         {/* Subscription Detail Card */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 sm:p-6">
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
-              <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">
+              <span className="text-xs uppercase tracking-wider font-bold text-slate-400">
                 Rincian Langganan
               </span>
               <h3 className="text-lg font-bold text-slate-900 mt-0.5">
-                {isPremium ? `Paket ${subscription?.plan}` : 'Paket Gratis (FREE)'}
+                {isPremium ? `Paket ${subscription?.plan}` : 'Paket Starter (FREE)'}
               </h3>
             </div>
             <button
               type="button"
               onClick={() => onNavigate('premium')}
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
             >
-              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <Crown className="w-3.5 h-3.5 text-amber-300" />
               <span>Kelola Langganan</span>
             </button>
           </div>
@@ -507,12 +511,12 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 text-xs">
             <div>
               <span className="text-slate-400 block mb-1">Paket Aktif</span>
-              <span className="font-bold text-slate-800">{subscription?.plan || 'FREE'}</span>
+              <span className="font-bold text-slate-800">{subscription?.plan || 'STARTER'}</span>
             </div>
             <div>
               <span className="text-slate-400 block mb-1">Status</span>
               <span className={`font-bold ${isPremium ? 'text-emerald-600' : 'text-slate-700'}`}>
-                {isPremium ? 'Aktif' : subscription?.status === 'PREMIUM_EXPIRED' ? 'Kedaluwarsa' : 'Gratis'}
+                {isPremium ? 'Aktif (PRO)' : subscription?.status === 'PREMIUM_EXPIRED' ? 'Kedaluwarsa' : 'Gratis'}
               </span>
             </div>
             <div>

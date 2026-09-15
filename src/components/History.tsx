@@ -183,7 +183,7 @@ export const History: React.FC<HistoryProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#F8FAFC] overflow-y-auto">
+    <div className="flex-1 flex flex-col h-full bg-[#F8FAFC] overflow-y-auto pb-24 sm:pb-8">
       {/* Top Header */}
       <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3.5 shadow-xs">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">

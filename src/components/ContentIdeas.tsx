@@ -266,7 +266,7 @@ Dibuat dengan ARVIN STUDIO AI Content Strategist`;
       id="content-ideas-container"
       className="flex-1 overflow-y-auto overflow-x-hidden bg-[#F8FAFC] flex flex-col w-full"
     >
-      <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col gap-5">
+      <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-8 flex flex-col gap-5">
         {/* Top Header Card */}
         <div
           id="content-ideas-header"

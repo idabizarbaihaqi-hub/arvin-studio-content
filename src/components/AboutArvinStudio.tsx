@@ -64,7 +64,7 @@ export const AboutArvinStudio: React.FC<AboutArvinStudioProps> = ({
   return (
     <div
       id="about-arvin-studio-view"
-      className="flex-1 overflow-y-auto bg-slate-50/60 p-4 sm:p-6 lg:p-8"
+      className="flex-1 overflow-y-auto bg-slate-50/60 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-8"
     >
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Navigation & Breadcrumb */}

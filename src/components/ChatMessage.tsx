@@ -42,9 +42,9 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
           id={`message-user-${message.id}`}
           className="flex justify-end mb-4 sm:mb-5 px-3 sm:px-4"
         >
-          <div className="max-w-[85%] sm:max-w-[78%] flex flex-col items-end">
+          <div className="max-w-[88%] sm:max-w-[80%] flex flex-col items-end">
             {message.image?.data && (
-              <div className="mb-2 relative group overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs bg-slate-100 max-w-[280px] sm:max-w-[340px]">
+              <div className="mb-2 relative group overflow-hidden rounded-2xl border border-slate-200 shadow-xs bg-slate-50 max-w-[280px] sm:max-w-[340px]">
                 <img
                   src={message.image.data}
                   alt={message.image.name || 'Screenshot analisis'}
@@ -53,17 +53,17 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
                 />
                 <div
                   onClick={() => setShowImageLightbox(true)}
-                  className="absolute bottom-2 right-2 bg-slate-950/70 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1 text-[11px]"
+                  className="absolute bottom-2 right-2 bg-slate-900/80 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center gap-1 text-[11px]"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
                   <span>Perbesar</span>
                 </div>
               </div>
             )}
-            <div className="bg-slate-900 text-white px-4 py-3 rounded-2xl rounded-br-xs shadow-md shadow-slate-900/10 text-sm sm:text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+            <div className="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-xs shadow-md shadow-blue-500/15 text-sm sm:text-[15px] leading-relaxed break-words whitespace-pre-wrap">
               {message.text}
             </div>
-            <span className="text-[11px] text-slate-400 mt-1 px-1">
+            <span className="text-[10px] font-medium text-slate-400 mt-1 px-1">
               {formattedTime}
             </span>
           </div>
@@ -76,7 +76,7 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
             onClick={() => setShowImageLightbox(false)}
           >
             <div
-              className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl p-2 shadow-2xl overflow-hidden"
+              className="relative max-w-4xl max-h-[90vh] bg-white rounded-3xl p-2 shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <button
@@ -90,10 +90,10 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
               <img
                 src={message.image.data}
                 alt={message.image.name || 'Screenshot'}
-                className="max-h-[82vh] max-w-full rounded-xl object-contain"
+                className="max-h-[82vh] max-w-full rounded-2xl object-contain"
               />
               {message.image.name && (
-                <div className="p-2 text-center text-xs font-medium text-slate-500">
+                <div className="p-2 text-center text-xs font-semibold text-slate-600">
                   {message.image.name}
                 </div>
               )}
@@ -111,13 +111,13 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
       className="flex items-start gap-2.5 sm:gap-3 mb-5 sm:mb-6 px-3 sm:px-4"
     >
       {/* Avatar Badge with AS Monogram */}
-      <div className="shrink-0 w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shadow-md shadow-slate-300 mt-0.5">
-        <AsLogo size={20} variant="light" />
+      <div className="shrink-0 w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 mt-0.5">
+        <AsLogo size={18} variant="light" />
       </div>
 
       <div className="flex-1 min-w-0 max-w-[92%] sm:max-w-[85%]">
         {message.isError ? (
-          <div className="bg-red-50/90 border border-red-200 rounded-2xl rounded-tl-xs p-4 text-red-900 shadow-sm shadow-red-100">
+          <div className="bg-red-50/90 border border-red-200 rounded-2xl rounded-tl-xs p-4 text-red-900 shadow-xs">
             <div className="flex items-center gap-2 mb-2 text-red-700 font-semibold text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>Koneksi AI Terputus</span>
@@ -131,7 +131,7 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
                   id="btn-retry-chat"
                   type="button"
                   onClick={onRetry}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors shadow-xs cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Coba Lagi</span>
@@ -140,7 +140,7 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
             </div>
           </div>
         ) : (
-          <div className="group relative bg-white border border-slate-200 rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-sm shadow-slate-200/50">
+          <div className="group relative bg-white border border-slate-200/90 rounded-2xl rounded-tl-xs p-4 sm:p-5 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
             {/* Markdown rendered output */}
             <div className="markdown-content text-sm sm:text-[15px] text-slate-800 leading-relaxed break-words">
               <Markdown
@@ -170,13 +170,13 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
                     <strong className="font-semibold text-slate-900" {...props} />
                   ),
                   blockquote: ({ ...props }) => (
-                    <blockquote className="border-l-3 border-slate-300 pl-3 italic text-slate-600 my-2" {...props} />
+                    <blockquote className="border-l-3 border-blue-500 pl-3 italic text-slate-600 my-2" {...props} />
                   ),
                   code: ({ ...props }) => (
                     <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs font-mono text-slate-800" {...props} />
                   ),
                   pre: ({ ...props }) => (
-                    <pre className="bg-slate-900 text-slate-100 p-3.5 rounded-xl overflow-x-auto text-xs font-mono my-2.5 shadow-sm" {...props} />
+                    <pre className="bg-slate-900 text-slate-100 p-3.5 rounded-xl overflow-x-auto text-xs font-mono my-2.5 shadow-xs" {...props} />
                   ),
                 }}
               >
@@ -186,14 +186,14 @@ export const ChatMessageItem: React.FC<ChatMessageProps> = ({
 
             {/* Message Action Footer */}
             <div className="flex items-center justify-between mt-3.5 pt-2.5 border-t border-slate-100 text-[11px] text-slate-400">
-              <span className="font-medium text-slate-500">ARVIN AI</span>
+              <span className="font-bold text-blue-600 tracking-wider text-[10px]">ARVIN AI</span>
               <div className="flex items-center gap-2">
                 <span>{formattedTime}</span>
                 <button
                   type="button"
                   onClick={handleCopy}
                   title="Salin jawaban"
-                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
                   aria-label="Salin teks respon"
                 >
                   {copied ? (

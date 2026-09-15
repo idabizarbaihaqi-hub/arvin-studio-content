@@ -279,7 +279,7 @@ export const ScriptMaker: React.FC<ScriptMakerProps> = ({ onBackToChat, onNaviga
         </div>
       )}
 
-      <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-6">
+      <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-8 space-y-6">
         {/* Header Bar */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">

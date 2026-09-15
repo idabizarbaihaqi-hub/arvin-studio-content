@@ -17,6 +17,7 @@ import {
   clearUserChatMessages,
 } from './services/chatStorageService';
 import { Header } from './components/Header';
+import { BottomNav } from './components/BottomNav';
 import { Sidebar } from './components/Sidebar';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessageItem } from './components/ChatMessage';
@@ -473,6 +474,8 @@ export default function App() {
         onOpenMenu={() => setIsOptionsMenuOpen(true)}
         hasMessages={messages.length > 0}
         activeView={activeView}
+        currentUser={currentUser}
+        onNavigate={setActiveView}
       />
 
       {/* Screen Content */}
@@ -564,6 +567,9 @@ export default function App() {
                   onSelectPrompt={(promptText) => {
                     handleSendMessage(promptText);
                   }}
+                  onNavigate={setActiveView}
+                  currentUser={currentUser}
+                  chatQuota={chatQuota}
                 />
               ) : (
                 <div id="messages-list" className="flex-1 flex flex-col w-full">
@@ -701,6 +707,15 @@ export default function App() {
           setShowChatQuotaModal(false);
           setActiveView('premium');
         }}
+      />
+
+      {/* Mobile-First Bottom Navigation */}
+      <BottomNav
+        activeView={activeView}
+        onSelectView={setActiveView}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+        onNewChat={handleNewChat}
+        hasMessages={messages.length > 0}
       />
     </div>
   );
