@@ -586,7 +586,9 @@ export default function App() {
             onUpgrade={() => setActiveView('premium')}
             onNavigateToEditVideo={(videoPayload) => {
               if (videoPayload) {
-                setPendingVideoForEditor(videoPayload);
+                const targetUrl = videoPayload.videoUrl || videoPayload.productPhotoUrl || videoPayload.modelPhotoUrl || '';
+                const targetName = `${videoPayload.productName || 'Iklan'}.mp4`;
+                setPendingVideoForEditor({ url: targetUrl, name: targetName });
               }
               setActiveView('edit-video');
             }}
