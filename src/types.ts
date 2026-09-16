@@ -50,7 +50,8 @@ export type SidebarMenuItemId =
   | 'credits'
   | 'profile'
   | 'settings'
-  | 'edit-video';
+  | 'edit-video'
+  | 'ai-video-ad';
 
 export interface MenuItem {
   id: SidebarMenuItemId;
@@ -183,7 +184,8 @@ export type ActiveView =
   | 'login'
   | 'register'
   | 'forgot-password'
-  | 'edit-video';
+  | 'edit-video'
+  | 'ai-video-ad';
 
 export type CaptionPlatform =
   | 'Instagram'
@@ -588,6 +590,13 @@ export interface UserProfile {
   // Free Credit & Trial tracking per UID
   chatAiUsage?: ChatDailyUsage;
   featureTrials?: Record<string, boolean>;
+  // AI Video Iklan 1x Lifetime Trial
+  aiVideoAdTrial?: {
+    used: boolean;
+    usedAt?: string | null;
+    isGenerating?: boolean;
+    lockExpiresAt?: number | null;
+  };
   // Backwards compatibility
   displayName?: string;
   credits?: number;
@@ -754,6 +763,85 @@ export interface AccountSummary {
   creditsUsed: number;
   dailyUsage: Record<AiFeatureKey, FeatureUsageStatus>;
   isPremium: boolean;
+}
+
+// ----------------------------------------------------
+// AI VIDEO IKLAN: 1x LIFETIME TRIAL & GENERATION TYPES
+// ----------------------------------------------------
+
+export interface AiVideoAdAccessCheck {
+  allowed: boolean;
+  isSuperAdmin: boolean;
+  isPremium: boolean;
+  trialUsed: boolean;
+  remaining: number; // 1 or 0 for Free, 9999 for Premium / Super Admin
+  isGenerating?: boolean;
+  reason:
+    | 'SUPER_ADMIN'
+    | 'PREMIUM'
+    | 'FREE_TRIAL_AVAILABLE'
+    | 'FREE_TRIAL_EXHAUSTED'
+    | 'UNAUTHENTICATED'
+    | 'LOCKED_GENERATING';
+}
+
+export interface AiVideoAdScene {
+  id: string;
+  order: number;
+  duration: number; // in seconds, e.g. 5
+  type: 'hook' | 'problem' | 'product_showcase' | 'benefit' | 'social_proof' | 'call_to_action';
+  title: string;
+  cameraMovement?: string;
+  humanMotion?: string;
+  productMotion?: string;
+  videoPrompt?: string;
+  voiceoverScript: string;
+  textOverlay?: string;
+  headline?: string;
+  subheadline?: string;
+  visualFocus?: 'model' | 'product' | 'split' | 'overlay';
+  badgeText?: string;
+  badgeColor?: string;
+  accentColor?: string;
+  animationType?: 'zoom-in' | 'slide-left' | 'fade-scale' | 'bounce-pop';
+  clipUrl?: string;
+}
+
+export interface AiVideoAdScriptPlan {
+  productName: string;
+  productDescription: string;
+  price: string;
+  promo: string;
+  targetAudience: string;
+  callToAction: string;
+  style: string;
+  duration: number; // 30 or 60
+  ratio: '9:16' | '1:1' | '16:9';
+  headlineHook: string;
+  fullCopywritingScript: string;
+  scenes: AiVideoAdScene[];
+}
+
+export interface GeneratedAiVideoAd {
+  id: string;
+  productName: string;
+  productDescription: string;
+  price?: string;
+  promo?: string;
+  targetAudience: string;
+  style: string;
+  ratio: '9:16' | '1:1' | '16:9';
+  totalDuration: number;
+  headlineHook: string;
+  fullCopywritingScript: string;
+  callToAction: string;
+  videoUrl?: string; // Real generated MP4 video URL
+  isRealVideo?: boolean;
+  modelPhotoUrl?: string;
+  productPhotoUrl?: string;
+  audioTrack?: string;
+  scenes: AiVideoAdScene[];
+  createdAt: string;
 }
 
 // ----------------------------------------------------

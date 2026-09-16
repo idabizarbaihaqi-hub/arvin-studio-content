@@ -45,6 +45,7 @@ export const SIDEBAR_MENU_GROUPS: MenuGroup[] = [
       { id: 'script-maker', label: 'Script Maker', iconName: '📜', badge: 'Naskah' },
       { id: 'hashtag-generator', label: 'Hashtag Generator', iconName: '#️⃣', badge: 'Tagar' },
       { id: 'edit-video', label: 'Edit Video', iconName: '🎬', badge: '🔒 Premium' },
+      { id: 'ai-video-ad', label: 'AI Video Iklan', iconName: '📢', badge: '1× Trial' },
     ],
   },
   {

@@ -77,6 +77,7 @@ export interface VideoClip {
   filter?: VideoFilterPreset;
   transitionAfter?: ClipTransition; // Transition from this clip to the next clip
   effects?: VideoEffectItem[]; // List of effects applied to this clip
+  speed?: number; // 0.25 to 2.0 (e.g. 0.5x, 1x, 1.5x, 2x)
 }
 
 export type AspectRatio = '9:16' | '16:9' | '1:1';
@@ -132,6 +133,7 @@ export interface TextOverlayItem {
   opacity: number; // 0 - 100
   startTime: number; // Global timeline seconds
   endTime: number; // Global timeline seconds
+  duration?: number; // Optional duration cache
   animation?: TextAnimation;
 }
 

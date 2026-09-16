@@ -4,6 +4,8 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ZoomIn,
   ZoomOut,
   Film,
@@ -58,6 +60,9 @@ interface TimelineProps {
   selectedSubtitleId?: string | null;
   onSelectSubtitle?: (id: string) => void;
   onAddSubtitleClick?: () => void;
+  isMinimized?: boolean;
+  onToggleMinimize?: () => void;
+  activeOverlayModal?: 'none' | 'text' | 'image' | 'audio' | 'subtitle';
 }
 
 export const Timeline: React.FC<TimelineProps> = ({
@@ -91,6 +96,9 @@ export const Timeline: React.FC<TimelineProps> = ({
   selectedSubtitleId = null,
   onSelectSubtitle,
   onAddSubtitleClick,
+  isMinimized = false,
+  onToggleMinimize,
+  activeOverlayModal = 'none',
 }) => {
   const rulerRef = useRef<HTMLDivElement>(null);
 
@@ -194,23 +202,49 @@ export const Timeline: React.FC<TimelineProps> = ({
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Minimize / Expand Timeline Toggle */}
+          {onToggleMinimize && (
+            <button
+              type="button"
+              onClick={onToggleMinimize}
+              className="p-1 px-1.5 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer transition-colors flex items-center gap-1 text-[10px] font-bold border border-slate-200"
+              title={isMinimized ? 'Perluas Timeline' : 'Perkecil Timeline'}
+            >
+              {isMinimized ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden sm:inline">Perluas</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">Perkecil</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Interactive Global Time Ruler & Playhead Multi-Track Viewport */}
       <div
         id="timeline-scroll-viewport"
-        className="w-full overflow-x-auto bg-slate-50/90 border border-slate-200 rounded-xl p-2.5 pb-3 relative"
+        className={`w-full overflow-x-auto bg-slate-50/90 border border-slate-200 rounded-xl relative transition-all ${
+          isMinimized ? 'p-1.5' : 'p-2 sm:p-2.5 pb-2.5'
+        }`}
       >
         <div
           style={{ width: `${Math.max(100, 100 * timelineZoom)}%`, minWidth: '100%' }}
-          className="relative flex flex-col gap-3"
+          className={`relative flex flex-col ${isMinimized ? 'gap-0' : 'gap-2'}`}
         >
           {/* Time Ruler (Click to seek anywhere in timeline) */}
           <div
             ref={rulerRef}
             onClick={handleRulerClick}
-            className="relative h-5 bg-white border border-slate-200/80 rounded-md cursor-pointer flex items-center justify-between px-2 text-[9px] font-mono text-slate-400 shadow-2xs hover:border-blue-300 transition-colors"
+            className={`relative ${
+              isMinimized ? 'h-6' : 'h-5'
+            } bg-white border border-slate-200/80 rounded-md cursor-pointer flex items-center justify-between px-2 text-[9px] font-mono text-slate-400 shadow-2xs hover:border-blue-300 transition-colors`}
             title="Klik pada ruler untuk menggeser waktu video"
           >
             <span>00:00</span>
@@ -230,15 +264,17 @@ export const Timeline: React.FC<TimelineProps> = ({
             )}
           </div>
 
-          {/* Global Playhead Needle traversing across ALL tracks */}
-          {totalDuration > 0 && (
-            <div
-              style={{ left: `${playheadPercent}%` }}
-              className="absolute top-5 bottom-0 w-0.5 bg-red-500 pointer-events-none z-40 transition-all duration-75"
-            >
-              <div className="w-2 h-2 -ml-[3px] bg-red-500 rounded-full shadow-sm" />
-            </div>
-          )}
+          {!isMinimized && (
+            <>
+              {/* Global Playhead Needle traversing across ALL tracks */}
+              {totalDuration > 0 && (
+                <div
+                  style={{ left: `${playheadPercent}%` }}
+                  className="absolute top-5 bottom-0 w-0.5 bg-red-500 pointer-events-none z-40 transition-all duration-75"
+                >
+                  <div className="w-2 h-2 -ml-[3px] bg-red-500 rounded-full shadow-sm" />
+                </div>
+              )}
 
           {/* 1. TRACK VIDEO CLIPS */}
           <div className="space-y-1">
@@ -432,303 +468,313 @@ export const Timeline: React.FC<TimelineProps> = ({
           </div>
 
           {/* 2. TRACK TEXT OVERLAYS */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 px-1">
-              <span className="flex items-center gap-1 text-blue-700">
-                <Type className="w-3 h-3 text-blue-600" />
-                <span>Track Teks ({texts.length})</span>
-              </span>
-              {onAddTextClick && (
-                <button
-                  type="button"
-                  onClick={onAddTextClick}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  <span>Tambah Teks</span>
-                </button>
-              )}
-            </div>
+          {(texts.length > 0 || activeOverlayModal === 'text') && (
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 px-1">
+                <span className="flex items-center gap-1 text-blue-700">
+                  <Type className="w-2.5 h-2.5 text-blue-600" />
+                  <span>Track Teks ({texts.length})</span>
+                </span>
+                {onAddTextClick && (
+                  <button
+                    type="button"
+                    onClick={onAddTextClick}
+                    className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus className="w-2 h-2" />
+                    <span>Tambah Teks</span>
+                  </button>
+                )}
+              </div>
 
-            <div className="relative h-10 bg-white rounded-xl border border-slate-200 p-1 flex items-center">
-              {texts.length === 0 ? (
-                <div
-                  onClick={onAddTextClick}
-                  className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 italic cursor-pointer hover:text-blue-600 transition-colors"
-                >
-                  + Klik untuk menambahkan teks overlay di timeline
-                </div>
-              ) : (
-                texts.map((txt) => {
-                  const isSelected = selectedTextId === txt.id;
-                  const startPct =
-                    totalDuration > 0
-                      ? Math.max(0, Math.min(100, (txt.startTime / totalDuration) * 100))
-                      : 0;
-                  const durationPct =
-                    totalDuration > 0
-                      ? Math.max(
-                          4,
-                          Math.min(100 - startPct, ((txt.endTime - txt.startTime) / totalDuration) * 100)
-                        )
-                      : 20;
+              <div className="relative h-7 bg-white rounded-lg border border-slate-200 p-0.5 flex items-center">
+                {texts.length === 0 ? (
+                  <div
+                    onClick={onAddTextClick}
+                    className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 italic cursor-pointer hover:text-blue-600 transition-colors"
+                  >
+                    + Klik untuk menambahkan teks overlay di timeline
+                  </div>
+                ) : (
+                  texts.map((txt) => {
+                    const isSelected = selectedTextId === txt.id;
+                    const startPct =
+                      totalDuration > 0
+                        ? Math.max(0, Math.min(100, (txt.startTime / totalDuration) * 100))
+                        : 0;
+                    const durationPct =
+                      totalDuration > 0
+                        ? Math.max(
+                            4,
+                            Math.min(100 - startPct, ((txt.endTime - txt.startTime) / totalDuration) * 100)
+                          )
+                        : 20;
 
-                  return (
-                    <div
-                      key={txt.id}
-                      onClick={() => {
-                        onSeek(txt.startTime);
-                        if (onSelectText) onSelectText(txt.id);
-                      }}
-                      style={{ left: `${startPct}%`, width: `${durationPct}%` }}
-                      className={`absolute h-7 rounded-lg px-2 flex items-center justify-between gap-1 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
-                        isSelected
-                          ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-500/30 z-20'
-                          : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200 z-10'
-                      }`}
-                      title={`Teks: "${txt.text}" (${formatTime(txt.startTime)} - ${formatTime(txt.endTime)})`}
-                    >
-                      <span className="text-[10px] font-bold truncate">
-                        {txt.text || 'Teks kosong'}
-                      </span>
-                      <span
-                        className={`text-[9px] font-mono shrink-0 ${
-                          isSelected ? 'text-blue-100' : 'text-blue-600'
+                    return (
+                      <div
+                        key={txt.id}
+                        onClick={() => {
+                          onSeek(txt.startTime);
+                          if (onSelectText) onSelectText(txt.id);
+                        }}
+                        style={{ left: `${startPct}%`, width: `${durationPct}%` }}
+                        className={`absolute h-5.5 rounded px-1.5 flex items-center justify-between gap-1 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-500/30 z-20'
+                            : 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-200 z-10'
                         }`}
+                        title={`Teks: "${txt.text}" (${formatTime(txt.startTime)} - ${formatTime(txt.endTime)})`}
                       >
-                        {(txt.endTime - txt.startTime).toFixed(1)}s
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* 3. TRACK IMAGE / LOGO OVERLAYS */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 px-1">
-              <span className="flex items-center gap-1 text-emerald-700">
-                <ImageIcon className="w-3 h-3 text-emerald-600" />
-                <span>Track Gambar / Logo ({images.length})</span>
-              </span>
-              {onAddImageClick && (
-                <button
-                  type="button"
-                  onClick={onAddImageClick}
-                  className="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  <span>Tambah Gambar</span>
-                </button>
-              )}
-            </div>
-
-            <div className="relative h-10 bg-white rounded-xl border border-slate-200 p-1 flex items-center">
-              {images.length === 0 ? (
-                <div
-                  onClick={onAddImageClick}
-                  className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 italic cursor-pointer hover:text-emerald-600 transition-colors"
-                >
-                  + Klik untuk menambahkan gambar / logo watermark di timeline
-                </div>
-              ) : (
-                images.map((img) => {
-                  const isSelected = selectedImageId === img.id;
-                  const startPct =
-                    totalDuration > 0
-                      ? Math.max(0, Math.min(100, (img.startTime / totalDuration) * 100))
-                      : 0;
-                  const durationPct =
-                    totalDuration > 0
-                      ? Math.max(
-                          4,
-                          Math.min(100 - startPct, ((img.endTime - img.startTime) / totalDuration) * 100)
-                        )
-                      : 20;
-
-                  return (
-                    <div
-                      key={img.id}
-                      onClick={() => {
-                        onSeek(img.startTime);
-                        if (onSelectImage) onSelectImage(img.id);
-                      }}
-                      style={{ left: `${startPct}%`, width: `${durationPct}%` }}
-                      className={`absolute h-7 rounded-lg px-1.5 flex items-center gap-1.5 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-500/30 z-20'
-                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200 z-10'
-                      }`}
-                      title={`Gambar: ${img.name} (${formatTime(img.startTime)} - ${formatTime(img.endTime)})`}
-                    >
-                      <div className="w-4 h-4 rounded bg-slate-900 overflow-hidden shrink-0 flex items-center justify-center">
-                        <img src={img.url} alt={img.name} className="w-full h-full object-contain" />
-                      </div>
-                      <span className="text-[10px] font-bold truncate">
-                        {img.name}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* 4. TRACK AUDIO / MUSIK */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 px-1">
-              <span className="flex items-center gap-1 text-amber-700">
-                <Music className="w-3 h-3 text-amber-600" />
-                <span>Track Musik / Audio ({audios.length})</span>
-              </span>
-              {onAddAudioClick && (
-                <button
-                  type="button"
-                  onClick={onAddAudioClick}
-                  className="text-[10px] font-bold text-amber-600 hover:text-amber-800 flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  <span>Tambah Audio</span>
-                </button>
-              )}
-            </div>
-
-            <div className="relative h-10 bg-white rounded-xl border border-slate-200 p-1 flex items-center">
-              {audios.length === 0 ? (
-                <div
-                  onClick={onAddAudioClick}
-                  className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 italic cursor-pointer hover:text-amber-600 transition-colors"
-                >
-                  + Klik untuk menambahkan musik latar / rekaman audio
-                </div>
-              ) : (
-                audios.map((aud) => {
-                  const isSelected = selectedAudioId === aud.id;
-                  const startPct =
-                    totalDuration > 0
-                      ? Math.max(0, Math.min(100, (aud.startTime / totalDuration) * 100))
-                      : 0;
-                  const durationPct =
-                    totalDuration > 0
-                      ? Math.max(
-                          6,
-                          Math.min(100 - startPct, (aud.duration / totalDuration) * 100)
-                        )
-                      : 30;
-
-                  return (
-                    <div
-                      key={aud.id}
-                      onClick={() => {
-                        onSeek(aud.startTime);
-                        if (onSelectAudio) onSelectAudio(aud.id);
-                      }}
-                      style={{ left: `${startPct}%`, width: `${durationPct}%` }}
-                      className={`absolute h-7 rounded-lg px-2 flex items-center justify-between gap-1.5 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
-                        isSelected
-                          ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-400/30 z-20'
-                          : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200 z-10'
-                      }`}
-                      title={`Audio: ${aud.name} (${formatTime(aud.startTime)} - ${formatTime(aud.startTime + aud.duration)})`}
-                    >
-                      <div className="flex items-center gap-1 min-w-0">
-                        {aud.isMuted ? (
-                          <VolumeX className="w-3 h-3 text-rose-500 shrink-0" />
-                        ) : (
-                          <Volume2 className="w-3 h-3 text-amber-600 shrink-0" />
-                        )}
-                        <span className="text-[10px] font-bold truncate">
-                          {aud.name}
+                        <span className="text-[9px] font-bold truncate">
+                          {txt.text || 'Teks kosong'}
+                        </span>
+                        <span
+                          className={`text-[8px] font-mono shrink-0 ${
+                            isSelected ? 'text-blue-100' : 'text-blue-600'
+                          }`}
+                        >
+                          {(txt.endTime - txt.startTime).toFixed(1)}s
                         </span>
                       </div>
-                      <span
-                        className={`text-[9px] font-mono shrink-0 ${
-                          isSelected ? 'text-amber-100' : 'text-amber-700'
-                        }`}
-                      >
-                        {aud.isMuted ? 'Muted' : `${aud.volume}%`}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 3. TRACK IMAGE / LOGO OVERLAYS */}
+          {(images.length > 0 || activeOverlayModal === 'image') && (
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 px-1">
+                <span className="flex items-center gap-1 text-emerald-700">
+                  <ImageIcon className="w-2.5 h-2.5 text-emerald-600" />
+                  <span>Track Gambar ({images.length})</span>
+                </span>
+                {onAddImageClick && (
+                  <button
+                    type="button"
+                    onClick={onAddImageClick}
+                    className="text-[9px] font-bold text-emerald-600 hover:text-emerald-800 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus className="w-2 h-2" />
+                    <span>Tambah Gambar</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="relative h-7 bg-white rounded-lg border border-slate-200 p-0.5 flex items-center">
+                {images.length === 0 ? (
+                  <div
+                    onClick={onAddImageClick}
+                    className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 italic cursor-pointer hover:text-emerald-600 transition-colors"
+                  >
+                    + Klik untuk menambahkan gambar / logo
+                  </div>
+                ) : (
+                  images.map((img) => {
+                    const isSelected = selectedImageId === img.id;
+                    const startPct =
+                      totalDuration > 0
+                        ? Math.max(0, Math.min(100, (img.startTime / totalDuration) * 100))
+                        : 0;
+                    const durationPct =
+                      totalDuration > 0
+                        ? Math.max(
+                            4,
+                            Math.min(100 - startPct, ((img.endTime - img.startTime) / totalDuration) * 100)
+                          )
+                        : 20;
+
+                    return (
+                      <div
+                        key={img.id}
+                        onClick={() => {
+                          onSeek(img.startTime);
+                          if (onSelectImage) onSelectImage(img.id);
+                        }}
+                        style={{ left: `${startPct}%`, width: `${durationPct}%` }}
+                        className={`absolute h-5.5 rounded px-1.5 flex items-center gap-1 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-500/30 z-20'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-200 z-10'
+                        }`}
+                        title={`Gambar: ${img.name}`}
+                      >
+                        <div className="w-3.5 h-3.5 rounded bg-slate-900 overflow-hidden shrink-0 flex items-center justify-center">
+                          <img src={img.url} alt={img.name} className="w-full h-full object-contain" />
+                        </div>
+                        <span className="text-[9px] font-bold truncate">
+                          {img.name}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 4. TRACK AUDIO / MUSIK */}
+          {(audios.length > 0 || activeOverlayModal === 'audio') && (
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 px-1">
+                <span className="flex items-center gap-1 text-amber-700">
+                  <Music className="w-2.5 h-2.5 text-amber-600" />
+                  <span>Track Audio ({audios.length})</span>
+                </span>
+                {onAddAudioClick && (
+                  <button
+                    type="button"
+                    onClick={onAddAudioClick}
+                    className="text-[9px] font-bold text-amber-600 hover:text-amber-800 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus className="w-2 h-2" />
+                    <span>Tambah Audio</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="relative h-7 bg-white rounded-lg border border-slate-200 p-0.5 flex items-center">
+                {audios.length === 0 ? (
+                  <div
+                    onClick={onAddAudioClick}
+                    className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 italic cursor-pointer hover:text-amber-600 transition-colors"
+                  >
+                    + Klik untuk menambahkan musik latar
+                  </div>
+                ) : (
+                  audios.map((aud) => {
+                    const isSelected = selectedAudioId === aud.id;
+                    const startPct =
+                      totalDuration > 0
+                        ? Math.max(0, Math.min(100, (aud.startTime / totalDuration) * 100))
+                        : 0;
+                    const durationPct =
+                      totalDuration > 0
+                        ? Math.max(
+                            6,
+                            Math.min(100 - startPct, (aud.duration / totalDuration) * 100)
+                          )
+                        : 30;
+
+                    return (
+                      <div
+                        key={aud.id}
+                        onClick={() => {
+                          onSeek(aud.startTime);
+                          if (onSelectAudio) onSelectAudio(aud.id);
+                        }}
+                        style={{ left: `${startPct}%`, width: `${durationPct}%` }}
+                        className={`absolute h-5.5 rounded px-1.5 flex items-center justify-between gap-1 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
+                          isSelected
+                            ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-400/30 z-20'
+                            : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200 z-10'
+                        }`}
+                        title={`Audio: ${aud.name}`}
+                      >
+                        <div className="flex items-center gap-1 min-w-0">
+                          {aud.isMuted ? (
+                            <VolumeX className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                          ) : (
+                            <Volume2 className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                          )}
+                          <span className="text-[9px] font-bold truncate">
+                            {aud.name}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-[8px] font-mono shrink-0 ${
+                            isSelected ? 'text-amber-100' : 'text-amber-700'
+                          }`}
+                        >
+                          {aud.isMuted ? 'Muted' : `${aud.volume}%`}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 5. TRACK SUBTITLE */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 px-1">
-              <span className="flex items-center gap-1 text-purple-700">
-                <MessageSquare className="w-3 h-3 text-purple-600" />
-                <span>Track Subtitle ({subtitles.length})</span>
-              </span>
-              {onAddSubtitleClick && (
-                <button
-                  type="button"
-                  onClick={onAddSubtitleClick}
-                  className="text-[10px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  <span>Tambah Subtitle</span>
-                </button>
-              )}
-            </div>
+          {(subtitles.length > 0 || activeOverlayModal === 'subtitle') && (
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-between text-[9px] font-bold text-slate-500 px-1">
+                <span className="flex items-center gap-1 text-purple-700">
+                  <MessageSquare className="w-2.5 h-2.5 text-purple-600" />
+                  <span>Track Subtitle ({subtitles.length})</span>
+                </span>
+                {onAddSubtitleClick && (
+                  <button
+                    type="button"
+                    onClick={onAddSubtitleClick}
+                    className="text-[9px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <Plus className="w-2 h-2" />
+                    <span>Tambah Subtitle</span>
+                  </button>
+                )}
+              </div>
 
-            <div className="relative h-10 bg-white rounded-xl border border-slate-200 p-1 flex items-center">
-              {subtitles.length === 0 ? (
-                <div
-                  onClick={onAddSubtitleClick}
-                  className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 italic cursor-pointer hover:text-purple-600 transition-colors"
-                >
-                  + Klik untuk menambahkan subtitle narasi / dialog manual
-                </div>
-              ) : (
-                subtitles.map((sub, idx) => {
-                  const isSelected = selectedSubtitleId === sub.id;
-                  const startPct =
-                    totalDuration > 0
-                      ? Math.max(0, Math.min(100, (sub.startTime / totalDuration) * 100))
-                      : 0;
-                  const durationPct =
-                    totalDuration > 0
-                      ? Math.max(
-                          4,
-                          Math.min(100 - startPct, ((sub.endTime - sub.startTime) / totalDuration) * 100)
-                        )
-                      : 15;
+              <div className="relative h-7 bg-white rounded-lg border border-slate-200 p-0.5 flex items-center">
+                {subtitles.length === 0 ? (
+                  <div
+                    onClick={onAddSubtitleClick}
+                    className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 italic cursor-pointer hover:text-purple-600 transition-colors"
+                  >
+                    + Klik untuk menambahkan subtitle teks
+                  </div>
+                ) : (
+                  subtitles.map((sub, idx) => {
+                    const isSelected = selectedSubtitleId === sub.id;
+                    const startPct =
+                      totalDuration > 0
+                        ? Math.max(0, Math.min(100, (sub.startTime / totalDuration) * 100))
+                        : 0;
+                    const durationPct =
+                      totalDuration > 0
+                        ? Math.max(
+                            4,
+                            Math.min(100 - startPct, ((sub.endTime - sub.startTime) / totalDuration) * 100)
+                          )
+                        : 15;
 
-                  return (
-                    <div
-                      key={sub.id}
-                      onClick={() => {
-                        onSeek(sub.startTime);
-                        if (onSelectSubtitle) onSelectSubtitle(sub.id);
-                      }}
-                      style={{ left: `${startPct}%`, width: `${durationPct}%` }}
-                      className={`absolute h-7 rounded-lg px-2 flex items-center justify-between gap-1 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
-                        isSelected
-                          ? 'bg-purple-600 text-white border-purple-700 ring-2 ring-purple-500/30 z-20'
-                          : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-200 z-10'
-                      }`}
-                      title={`#${idx + 1} "${sub.text}" (${formatTime(sub.startTime)} - ${formatTime(sub.endTime)})`}
-                    >
-                      <span className="text-[10px] font-bold truncate">
-                        #{idx + 1} {sub.text || 'Kosong'}
-                      </span>
-                      <span
-                        className={`text-[9px] font-mono shrink-0 ${
-                          isSelected ? 'text-purple-100' : 'text-purple-600'
+                    return (
+                      <div
+                        key={sub.id}
+                        onClick={() => {
+                          onSeek(sub.startTime);
+                          if (onSelectSubtitle) onSelectSubtitle(sub.id);
+                        }}
+                        style={{ left: `${startPct}%`, width: `${durationPct}%` }}
+                        className={`absolute h-5.5 rounded px-1.5 flex items-center justify-between gap-1 transition-all cursor-pointer overflow-hidden border shadow-2xs ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-purple-700 ring-2 ring-purple-500/30 z-20'
+                            : 'bg-purple-50 hover:bg-purple-100 text-purple-900 border-purple-200 z-10'
                         }`}
+                        title={`#${idx + 1} "${sub.text}"`}
                       >
-                        {(sub.endTime - sub.startTime).toFixed(1)}s
-                      </span>
-                    </div>
-                  );
-                })
-              )}
+                        <span className="text-[9px] font-bold truncate">
+                          #{idx + 1} {sub.text || 'Kosong'}
+                        </span>
+                        <span
+                          className={`text-[8px] font-mono shrink-0 ${
+                            isSelected ? 'text-purple-100' : 'text-purple-600'
+                          }`}
+                        >
+                          {(sub.endTime - sub.startTime).toFixed(1)}s
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          )}
+        </>
+      )}
         </div>
       </div>
     </div>

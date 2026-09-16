@@ -14,11 +14,15 @@ const VideoEditorLazy = lazy(() => import('./VideoEditor'));
 interface EditVideoContainerProps {
   currentUser?: UserProfile | null;
   onNavigate: (view: ActiveView) => void;
+  initialVideoUrl?: string;
+  initialVideoName?: string;
 }
 
 export const EditVideoContainer: React.FC<EditVideoContainerProps> = ({
   currentUser,
   onNavigate,
+  initialVideoUrl,
+  initialVideoName,
 }) => {
   const [checking, setChecking] = useState(true);
   const [access, setAccess] = useState<VideoEditorAccessResult | null>(null);
@@ -105,7 +109,10 @@ export const EditVideoContainer: React.FC<EditVideoContainerProps> = ({
       <VideoEditorLazy
         currentUser={currentUser}
         onBack={() => onNavigate('home')}
+        onNavigateToPremium={() => onNavigate('premium')}
         isSuperAdmin={access.isSuperAdmin}
+        initialVideoUrl={initialVideoUrl}
+        initialVideoName={initialVideoName}
       />
     </Suspense>
   );

@@ -82,18 +82,26 @@ import { TextPanel } from './TextPanel';
 import { ImagePanel } from './ImagePanel';
 import { AudioPanel } from './AudioPanel';
 import { SubtitlePanel } from './SubtitlePanel';
+import { ExportModal } from './ExportModal';
 
 interface VideoEditorProps {
   currentUser?: UserProfile | null;
   onBack: () => void;
   isSuperAdmin?: boolean;
+  onNavigateToPremium?: () => void;
+  initialVideoUrl?: string;
+  initialVideoName?: string;
 }
 
 export const VideoEditor: React.FC<VideoEditorProps> = ({
   currentUser,
   onBack,
   isSuperAdmin,
+  onNavigateToPremium,
+  initialVideoUrl,
+  initialVideoName,
 }) => {
+  const initialVideoLoadedRef = useRef(false);
   // 1. Clips List & History (Multi-Clip Project Session)
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
@@ -187,12 +195,8 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
     junctionIndex: number;
   } | null>(null);
 
-  // Export Modal State
+  // Export Modal State (Tahap 6: Real Video Export)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportResolution, setExportResolution] = useState<'1080p' | '720p'>('1080p');
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [exportComplete, setExportComplete] = useState(false);
 
   // Ref tracking object URLs to revoke on unmount
   const createdUrlsRef = useRef<Set<string>>(new Set());
@@ -921,6 +925,30 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
     setProcessingMessage('');
   };
 
+  // Otomatis muat klip dari AI Video Iklan jika dikirim melalui onNavigateToEditVideo
+  useEffect(() => {
+    if (initialVideoUrl && !initialVideoLoadedRef.current && clips.length === 0) {
+      initialVideoLoadedRef.current = true;
+      setIsProcessing(true);
+      setProcessingMessage('Memuat video hasil AI Video Iklan ke editor...');
+      fetch(initialVideoUrl)
+        .then((res) => res.blob())
+        .then(async (blob) => {
+          const fileName = initialVideoName || 'ai_video_iklan.mp4';
+          const file = new File([blob], fileName, { type: blob.type || 'video/mp4' });
+          await handleFilesUpload([file]);
+        })
+        .catch((err) => {
+          console.warn('Gagal memuat video awal ke editor:', err);
+          setErrorMessage('Gagal memuat video iklan ke editor.');
+        })
+        .finally(() => {
+          setIsProcessing(false);
+          setProcessingMessage('');
+        });
+    }
+  }, [initialVideoUrl, initialVideoName, clips.length]);
+
   // Drop File Handler
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -1242,39 +1270,6 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
       default:
         return 'aspect-[9/16] h-full max-h-full max-w-full object-contain';
     }
-  };
-
-  // Export Simulation
-  const handleStartExport = () => {
-    setIsExporting(true);
-    setExportProgress(0);
-    setExportComplete(false);
-
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 15) + 10;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        setExportProgress(100);
-        setIsExporting(false);
-        setExportComplete(true);
-      } else {
-        setExportProgress(progress);
-      }
-    }, 280);
-  };
-
-  // Download Video
-  const handleDownloadVideo = () => {
-    if (clips.length === 0) return;
-    // Download first clip URL with filename
-    const link = document.createElement('a');
-    link.href = clips[0].url;
-    link.download = `arvin_studio_edited_${Date.now()}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -2176,210 +2171,23 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
         </main>
       )}
 
-      {/* 7. Export Modal */}
-      {isExportModalOpen && (
-        <div
-          id="export-video-modal-overlay"
-          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
-          onClick={() => {
-            if (!isExporting) setIsExportModalOpen(false);
-          }}
-        >
-          <div
-            id="export-video-modal"
-            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 shadow-2xl flex flex-col max-h-[88dvh] sm:max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Mobile Drag Indicator */}
-            <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
-
-            {/* Header (Sticky) */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/70">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <Download className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-slate-900 text-sm truncate">
-                    Ekspor Video Gabungan
-                  </h3>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    {clips.length} klip video • Durasi: {formatTime(totalDuration)}
-                  </p>
-                </div>
-              </div>
-
-              {!isExporting && (
-                <button
-                  type="button"
-                  onClick={() => setIsExportModalOpen(false)}
-                  className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-
-            {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 space-y-4">
-              {!exportComplete ? (
-                <>
-                  {/* Resolution Selector */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-2">
-                      Resolusi Video:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        disabled={isExporting}
-                        onClick={() => setExportResolution('1080p')}
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                          exportResolution === '1080p'
-                            ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-500/20'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="font-bold text-slate-800 text-xs">1080p Full HD</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          Kualitas terbaik untuk Reels & TikTok
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={isExporting}
-                        onClick={() => setExportResolution('720p')}
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                          exportResolution === '720p'
-                            ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-500/20'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="font-bold text-slate-800 text-xs">720p HD</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          Ukuran file lebih hemat & cepat
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Aspect Ratio & Track Elements Summary */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5 text-xs text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <span>Rasio Format Video:</span>
-                      <span className="font-bold text-slate-800">{aspectRatio}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Jumlah Klip:</span>
-                      <span className="font-bold text-slate-800">{clips.length} Klip ({formatTime(totalDuration)})</span>
-                    </div>
-                    {(texts.length > 0 || images.length > 0 || audios.length > 0 || subtitles.length > 0) && (
-                      <div className="pt-1.5 border-t border-slate-200 flex flex-wrap gap-1.5 text-[11px]">
-                        {texts.length > 0 && (
-                          <span className="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-md">
-                            {texts.length} Teks
-                          </span>
-                        )}
-                        {images.length > 0 && (
-                          <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-md">
-                            {images.length} Gambar/Stiker
-                          </span>
-                        )}
-                        {audios.length > 0 && (
-                          <span className="bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-md">
-                            1 Backsound
-                          </span>
-                        )}
-                        {subtitles.length > 0 && (
-                          <span className="bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-md">
-                            {subtitles.length} Subtitle
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Progress bar if exporting */}
-                  {isExporting && (
-                    <div className="space-y-2 pt-2">
-                      <div className="flex justify-between text-xs font-bold text-slate-700">
-                        <span>Memproses Penggabungan Klip...</span>
-                        <span>{exportProgress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          style={{ width: `${exportProgress}%` }}
-                          className="h-full bg-blue-600 rounded-full transition-all duration-200"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Export Complete State */
-                <div className="text-center py-4 space-y-4">
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
-                    <Check className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-slate-900 text-lg">Video Siap Diunduh!</h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Rendering selesai dalam resolusi {exportResolution} ({aspectRatio}).
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sticky Footer */}
-            <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50/90 flex items-center gap-2 shrink-0 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
-              {!exportComplete ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={isExporting}
-                    onClick={handleStartExport}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm py-2.5 sm:py-3 px-4 rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
-                  >
-                    {isExporting ? 'Sedang Memproses...' : 'Mulai Ekspor Sekarang'}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isExporting}
-                    onClick={() => setIsExportModalOpen(false)}
-                    className="px-4 py-2.5 sm:py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                </>
-              ) : (
-                <div className="w-full flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleDownloadVideo();
-                      setIsExportModalOpen(false);
-                    }}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3 px-4 rounded-xl shadow-md shadow-emerald-600/20 transition-all cursor-pointer active:scale-95"
-                  >
-                    Unduh Video ({exportResolution})
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsExportModalOpen(false)}
-                    className="w-full text-xs text-slate-500 hover:text-slate-800 py-1.5 cursor-pointer"
-                  >
-                    Tutup
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 7. Real Video Export Modal (Tahap 6) */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        clips={clips}
+        texts={texts}
+        images={images}
+        subtitles={subtitles}
+        audios={audios}
+        aspectRatio={aspectRatio}
+        rotation={rotation}
+        originalAudioVolume={originalAudioVolume}
+        isOriginalAudioMuted={isOriginalAudioMuted}
+        currentUser={currentUser}
+        isSuperAdmin={isSuperAdmin}
+        onNavigateToPremium={onNavigateToPremium}
+      />
     </div>
   );
 };

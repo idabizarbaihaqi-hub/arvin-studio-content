@@ -93,6 +93,15 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       },
     },
     {
+      id: 'ai-video-ad',
+      title: 'AI Video Iklan',
+      desc: 'Buat video promosi komersial viral dengan foto model & produk (1× Gratis).',
+      badge: '1× Trial',
+      badgeType: 'blue',
+      icon: Video,
+      action: () => onNavigate && onNavigate('ai-video-ad'),
+    },
+    {
       id: 'ai-thumbnail-generator',
       title: 'AI Thumbnail Generator',
       desc: 'Create engaging video thumbnails.',
