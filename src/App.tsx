@@ -49,7 +49,6 @@ import { FeaturePlaceholderModal } from './components/FeaturePlaceholderModal';
 import { OptionsMenuModal } from './components/OptionsMenuModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { EditVideoContainer } from './components/video/EditVideoContainer';
-import { AiVideoAdView } from './components/video/AiVideoAdView';
 import { SuperAdminGuard } from './components/admin/SuperAdminGuard';
 
 export default function App() {
@@ -65,7 +64,6 @@ export default function App() {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       if (path === '/edit-video') return 'edit-video';
-      if (path === '/ai-video-ad' || path === '/video-iklan') return 'ai-video-ad';
     }
     return 'home';
   });
@@ -137,8 +135,6 @@ export default function App() {
         setAppRoute('dashboard');
         if (path === '/edit-video') {
           setActiveView('edit-video');
-        } else if (path === '/ai-video-ad' || path === '/video-iklan') {
-          setActiveView('ai-video-ad');
         }
       }
     };
@@ -576,24 +572,6 @@ export default function App() {
           initialVideoUrl={pendingVideoForEditor?.url}
           initialVideoName={pendingVideoForEditor?.name}
         />
-      ) : activeView === 'ai-video-ad' ? (
-        <main
-          id="ai-video-ad-main-container"
-          className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col w-full pb-24 sm:pb-8"
-        >
-          <AiVideoAdView
-            currentUser={currentUser}
-            onUpgrade={() => setActiveView('premium')}
-            onNavigateToEditVideo={(videoPayload) => {
-              if (videoPayload && videoPayload.videoUrl) {
-                const targetUrl = videoPayload.videoUrl;
-                const targetName = `${videoPayload.productName || 'Iklan'}.mp4`;
-                setPendingVideoForEditor({ url: targetUrl, name: targetName });
-              }
-              setActiveView('edit-video');
-            }}
-          />
-        </main>
       ) : activeView === 'home' ? (
         /* ---------------- Home Studio Dashboard (No Chat Footer!) ---------------- */
         <main

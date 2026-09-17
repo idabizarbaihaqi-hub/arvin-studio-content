@@ -16,10 +16,6 @@
         "plan": { "type": "string", "enum": ["FREE", "PREMIUM"], "description": "Paket aktif" },
         "subscriptionStatus": { "type": "string", "enum": ["INACTIVE", "ACTIVE"], "description": "Status langganan aktif atau tidak" },
         "subscriptionExpiry": { "type": "string", "description": "Tanggal kedaluwarsa langganan premium ISO jika ada" },
-        "aiVideoAdTrial": {
-          "type": "object",
-          "description": "Status 1x lifetime trial AI Video Iklan (used: boolean, usedAt: string, isGenerating: boolean)"
-        },
         "createdAt": { "type": "string", "description": "Waktu pendaftaran ISO" },
         "updatedAt": { "type": "string", "description": "Waktu pembaruan profil ISO" }
       },

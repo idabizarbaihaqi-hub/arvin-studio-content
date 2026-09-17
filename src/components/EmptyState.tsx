@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { TechArtBlob } from './TechArtBlob';
+import { RobotMascotWelcome } from './RobotMascotWelcome';
 import { ChatImageAttachment, ActiveView, UserProfile } from '../types';
 
 interface EmptyStateProps {
@@ -91,15 +92,6 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           onSelectPrompt('Buatkan konsep dan strategi konten kreatif berbobot tinggi untuk: ');
         }
       },
-    },
-    {
-      id: 'ai-video-ad',
-      title: 'AI Video Iklan',
-      desc: 'Buat video promosi komersial viral dengan foto model & produk (1× Gratis).',
-      badge: '1× Trial',
-      badgeType: 'blue',
-      icon: Video,
-      action: () => onNavigate && onNavigate('ai-video-ad'),
     },
     {
       id: 'ai-thumbnail-generator',
@@ -261,9 +253,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           </button>
         </div>
 
-        {/* Right: 3D Organic Cyber Network Graphic (Exact Reproduction) */}
-        <div className="shrink-0 flex items-center justify-center">
-          <TechArtBlob size={128} className="sm:w-[155px] sm:h-[155px]" />
+        {/* Right: Robot AI Mascot ARVIN STUDIO yang Melompat-lompat Menyambut Pengguna */}
+        <div className="shrink-0 flex items-center justify-center pl-1">
+          <RobotMascotWelcome />
         </div>
       </section>
 

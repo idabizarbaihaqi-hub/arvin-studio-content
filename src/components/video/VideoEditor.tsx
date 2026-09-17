@@ -925,22 +925,22 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
     setProcessingMessage('');
   };
 
-  // Otomatis muat klip dari AI Video Iklan jika dikirim melalui onNavigateToEditVideo
+  // Otomatis muat klip video jika dikirim melalui initialVideoUrl
   useEffect(() => {
     if (initialVideoUrl && !initialVideoLoadedRef.current && clips.length === 0) {
       initialVideoLoadedRef.current = true;
       setIsProcessing(true);
-      setProcessingMessage('Memuat video hasil AI Video Iklan ke editor...');
+      setProcessingMessage('Memuat video ke editor...');
       fetch(initialVideoUrl)
         .then((res) => res.blob())
         .then(async (blob) => {
-          const fileName = initialVideoName || 'ai_video_iklan.mp4';
+          const fileName = initialVideoName || 'video_project.mp4';
           const file = new File([blob], fileName, { type: blob.type || 'video/mp4' });
           await handleFilesUpload([file]);
         })
         .catch((err) => {
           console.warn('Gagal memuat video awal ke editor:', err);
-          setErrorMessage('Gagal memuat video iklan ke editor.');
+          setErrorMessage('Gagal memuat video ke editor.');
         })
         .finally(() => {
           setIsProcessing(false);
