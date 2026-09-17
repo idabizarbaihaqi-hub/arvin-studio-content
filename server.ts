@@ -2926,8 +2926,262 @@ Format JSON yang WAJIB dihasilkan:
   }
 });
 
-// 4. POST /api/ai-video-ad/generate-real-video (Langkah 2: Generate REAL AI VIDEO dari model video)
-app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Response) => {
+// ============================================================================
+// JOB-BASED REAL AI VIDEO GENERATION ENGINE (ANTI-SLIDESHOW MANDATE)
+// ============================================================================
+
+interface VideoAdJob {
+  id: string;
+  userId: string;
+  email?: string;
+  status: "QUEUED" | "ANALYZING" | "SCRIPTING" | "GENERATING_SCENE" | "COMPOSING" | "COMPLETED" | "FAILED";
+  step: string;
+  currentScene?: number;
+  totalScenes?: number;
+  videoUrl?: string;
+  error?: string;
+  errorStage?: string;
+  errorDetails?: string;
+  trialUsed: boolean;
+  productName: string;
+  totalDuration: number;
+  scenes: any[];
+  createdAt: number;
+  completedAt?: number;
+}
+
+const videoAdJobs: Record<string, VideoAdJob> = {};
+
+// Clean up stale jobs older than 3 hours
+setInterval(() => {
+  const threeHoursAgo = Date.now() - 3 * 3600 * 1000;
+  for (const id in videoAdJobs) {
+    if (videoAdJobs[id].createdAt < threeHoursAgo) {
+      delete videoAdJobs[id];
+    }
+  }
+}, 30 * 60 * 1000);
+
+async function executeVeoVideoGeneration(params: {
+  apiKey: string;
+  productName: string;
+  duration: number;
+  ratio: string;
+  scenes: any[];
+  onProgress?: (step: string, stage: string) => void;
+}): Promise<{ videoUrl: string; filename: string; duration: number }> {
+  const { apiKey, productName, duration, ratio, scenes, onProgress } = params;
+
+  onProgress?.("Menghubungkan ke Video Generation Model (Google Veo)...", "GENERATING_SCENE");
+
+  const ai = new GoogleGenAI({ apiKey });
+  const targetAspect = ratio === "16:9" ? "16:9" : "9:16";
+
+  const hookScene = scenes[0] || {};
+  const primaryPrompt =
+    hookScene.videoPrompt ||
+    `Cinematic commercial video for ${productName}, photorealistic human model presenting the product with dynamic camera movement, commercial studio lighting, 4k 24fps`;
+
+  const modelCandidates = [
+    "veo-3.1-fast-generate-preview",
+    "veo-3.1-lite-generate-preview",
+    "veo-3.1-generate-preview",
+  ];
+
+  let videoOperation: any = null;
+  let usedModel = modelCandidates[0];
+  let lastError: any = null;
+
+  for (const modelName of modelCandidates) {
+    try {
+      console.log(`[ARVIN AI Video Engine] Attempting model ${modelName}...`);
+      onProgress?.(`Membuat klip video iklan dengan AI Model (${modelName})...`, "GENERATING_SCENE");
+      videoOperation = await ai.models.generateVideos({
+        model: modelName,
+        prompt: primaryPrompt,
+        config: {
+          numberOfVideos: 1,
+          resolution: "720p",
+          aspectRatio: targetAspect,
+        },
+      });
+      usedModel = modelName;
+      if (videoOperation && videoOperation.name) {
+        break;
+      }
+    } catch (err: any) {
+      console.warn(`[ARVIN AI Video Engine] ${modelName} failed:`, err?.message);
+      lastError = err;
+      // If 429 quota or resource exhausted, stop trying next candidates to avoid repeated quota spam
+      if (
+        err?.message?.includes("429") ||
+        err?.message?.includes("RESOURCE_EXHAUSTED") ||
+        err?.message?.includes("quota")
+      ) {
+        break;
+      }
+    }
+  }
+
+  if (!videoOperation || !videoOperation.name) {
+    const isQuota =
+      lastError?.message?.includes("429") ||
+      lastError?.message?.includes("RESOURCE_EXHAUSTED") ||
+      lastError?.message?.includes("quota");
+
+    const errObj = new Error(
+      isQuota
+        ? "AI Video Generation gagal diproses: Kuota video-generation API terlampaui (429 Resource Exhausted) atau API belum aktif pada konfigurasi project ini."
+        : "Video Generation API belum tersedia atau gagal dipanggil pada project ini."
+    );
+    (errObj as any).stage = "Video Generation Engine (Veo)";
+    (errObj as any).details = lastError?.message || "Model video generator tidak dapat merespons permintaan video.";
+    (errObj as any).isQuota = isQuota;
+    throw errObj;
+  }
+
+  console.log(`[ARVIN AI Video Engine] Polling Veo operation: ${videoOperation.name}`);
+  onProgress?.("AI sedang merender frame video fotorealistik (Veo Processing)...", "GENERATING_SCENE");
+
+  const op = new GenerateVideosOperation();
+  op.name = videoOperation.name;
+
+  let updatedOp = await ai.operations.getVideosOperation({ operation: op });
+  let attempts = 0;
+  const maxAttempts = 60; // 5-6 minutes
+
+  while (!updatedOp.done && attempts < maxAttempts) {
+    await new Promise((r) => setTimeout(r, 5000));
+    attempts++;
+    onProgress?.(`Merender video iklan... (${attempts * 5}s)`, "GENERATING_SCENE");
+    updatedOp = await ai.operations.getVideosOperation({ operation: op });
+  }
+
+  if (!updatedOp.done) {
+    const timeoutErr = new Error("Proses pembuatan video melebihi batas waktu (timeout).");
+    (timeoutErr as any).stage = "Video Rendering Timeout";
+    throw timeoutErr;
+  }
+
+  const downloadUri = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
+  if (!downloadUri) {
+    const noUriErr = new Error("URI video hasil generate tidak ditemukan pada respons model.");
+    (noUriErr as any).stage = "Video URI Extraction";
+    throw noUriErr;
+  }
+
+  onProgress?.("Mengunduh dan memvalidasi file video MP4...", "COMPOSING");
+  console.log(`[ARVIN AI Video Engine] Downloading generated video from ${downloadUri}...`);
+
+  const videoRes = await fetch(downloadUri, {
+    headers: { "x-goog-api-key": apiKey },
+  });
+
+  if (!videoRes.ok) {
+    const fetchErr = new Error(`Gagal mengunduh file video dari Google Cloud Storage: HTTP ${videoRes.status}`);
+    (fetchErr as any).stage = "Video Download";
+    throw fetchErr;
+  }
+
+  const arrayBuffer = await videoRes.arrayBuffer();
+  const videoBuffer = Buffer.from(arrayBuffer);
+
+  const videoId = `ad_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const outputFilename = `${videoId}.mp4`;
+  const outputPath = path.join(VIDEO_UPLOADS_DIR, outputFilename);
+
+  fs.writeFileSync(outputPath, videoBuffer);
+  console.log(`[ARVIN AI Video Engine] Saved real video to ${outputPath} (${videoBuffer.length} bytes)`);
+
+  // Verify real video container with ffprobe
+  try {
+    const probeOutput = execSync(
+      `ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1:nokey=1 "${outputPath}"`,
+      { encoding: "utf-8" }
+    );
+    console.log(`[ARVIN AI Video Engine] FFprobe verified video: ${probeOutput.trim()}`);
+  } catch (probeErr: any) {
+    console.warn("[ARVIN AI Video Engine] FFprobe validation note:", probeErr?.message);
+  }
+
+  return {
+    videoUrl: `/uploads/videos/${outputFilename}`,
+    filename: outputFilename,
+    duration: Number(duration) || 30,
+  };
+}
+
+async function runVideoAdJob(jobId: string, payload: any) {
+  const job = videoAdJobs[jobId];
+  if (!job) return;
+
+  const { userId, productName, duration = 30, ratio = "9:16", scenes = [] } = payload;
+
+  try {
+    job.status = "ANALYZING";
+    job.step = "Menganalisis produk & asset visual...";
+
+    const videoApiKey =
+      process.env.VEO_API_KEY ||
+      process.env.VIDEO_API_KEY ||
+      process.env.GEMINI_API_KEY;
+
+    if (!videoApiKey) {
+      job.status = "FAILED";
+      job.step = "Pembuatan video gagal.";
+      job.errorStage = "Video Generation Engine";
+      job.error = "Video Generation API belum tersedia atau belum terkonfigurasi pada project ini.";
+      job.errorDetails = "API Key untuk video generation belum disetel di environment.";
+      job.trialUsed = false;
+      if (activeVideoAdLocks[userId]) delete activeVideoAdLocks[userId];
+      return;
+    }
+
+    job.status = "SCRIPTING";
+    job.step = "Menyiapkan prompt teknis video generator...";
+    await new Promise((r) => setTimeout(r, 400));
+
+    const result = await executeVeoVideoGeneration({
+      apiKey: videoApiKey,
+      productName,
+      duration,
+      ratio,
+      scenes,
+      onProgress: (stepText, stageName) => {
+        job.step = stepText;
+        if (stageName === "GENERATING_SCENE" || stageName === "COMPOSING") {
+          job.status = stageName as any;
+        }
+      },
+    });
+
+    job.status = "COMPLETED";
+    job.step = "Video iklan komersial berhasil dibuat!";
+    job.videoUrl = result.videoUrl;
+    job.completedAt = Date.now();
+    job.trialUsed = false; // Trial will be marked consumed only after client confirms playback or loads into editor!
+
+    if (activeVideoAdLocks[userId]) {
+      delete activeVideoAdLocks[userId];
+    }
+  } catch (err: any) {
+    console.error(`[ARVIN AI Video Engine] Job ${jobId} failed:`, err?.message || err);
+
+    job.status = "FAILED";
+    job.step = "AI Video Generation gagal.";
+    job.errorStage = err?.stage || "Video Generation";
+    job.error = err?.message || "AI Video Generation gagal. Tidak ada video yang berhasil dibuat.";
+    job.errorDetails = err?.details || err?.message || "Model video generator saat ini tidak dapat memproses permintaan.";
+    job.trialUsed = false;
+
+    if (activeVideoAdLocks[userId]) {
+      delete activeVideoAdLocks[userId];
+    }
+  }
+}
+
+// 4.1 POST /api/ai-video-ad/job/create (Langkah 2: Create Generation Job - Async Job Processing)
+app.post("/api/ai-video-ad/job/create", async (req: Request, res: Response) => {
   const {
     userId,
     email,
@@ -2939,6 +3193,7 @@ app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Respo
     productPhotoUrl = "",
     price = "",
     promo = "",
+    style = "Trendy TikTok & Reels",
   } = req.body || {};
 
   if (!productName || typeof productName !== "string" || !productName.trim()) {
@@ -2965,9 +3220,112 @@ app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Respo
         code: "TRIAL_ALREADY_USED",
       });
     }
+  }
 
-    // Acquire atomic generation lock
-    activeVideoAdLocks[effectiveUserId] = Date.now();
+  // Anti double generation lock check
+  const lockTime = activeVideoAdLocks[effectiveUserId];
+  if (lockTime && Date.now() - lockTime < 180000) {
+    return res.status(409).json({
+      success: false,
+      code: "GENERATION_IN_PROGRESS",
+      error: "Proses pembuatan video iklan sedang berjalan. Mohon tunggu hingga selesai.",
+    });
+  }
+
+  activeVideoAdLocks[effectiveUserId] = Date.now();
+
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const job: VideoAdJob = {
+    id: jobId,
+    userId: effectiveUserId,
+    email: cleanEmail,
+    status: "QUEUED",
+    step: "Menyiapkan antrian pembuatan video...",
+    productName: productName.trim(),
+    totalDuration: Number(duration) || 30,
+    scenes: Array.isArray(scenes) ? scenes : [],
+    trialUsed: false,
+    createdAt: Date.now(),
+  };
+
+  videoAdJobs[jobId] = job;
+
+  // Run job asynchronously in background
+  runVideoAdJob(jobId, {
+    userId: effectiveUserId,
+    productName: productName.trim(),
+    duration,
+    ratio,
+    scenes,
+    modelPhotoUrl,
+    productPhotoUrl,
+    price,
+    promo,
+    style,
+  }).catch((err) => {
+    console.error("[ARVIN AI Video Engine] Unhandled job runner error:", err);
+  });
+
+  res.json({
+    success: true,
+    jobId,
+    status: "QUEUED",
+    message: "Job video iklan berhasil dibuat dan sedang diproses.",
+  });
+});
+
+// 4.2 GET /api/ai-video-ad/job/status (Polling Status Job)
+app.get("/api/ai-video-ad/job/status", (req: Request, res: Response) => {
+  const jobId = (req.query.jobId || req.headers["x-job-id"]) as string;
+  if (!jobId) {
+    return res.status(400).json({ error: "jobId diperlukan." });
+  }
+
+  const job = videoAdJobs[jobId];
+  if (!job) {
+    return res.status(404).json({ error: "Job tidak ditemukan atau telah kedaluwarsa." });
+  }
+
+  res.json({
+    success: true,
+    job,
+  });
+});
+
+// 4.3 POST /api/ai-video-ad/generate-real-video (Direct Sync / Polling Fallback)
+app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Response) => {
+  const {
+    userId,
+    email,
+    productName,
+    duration = 30,
+    ratio = "9:16",
+    scenes = [],
+  } = req.body || {};
+
+  if (!productName || typeof productName !== "string" || !productName.trim()) {
+    return res.status(400).json({ error: "Nama produk wajib diisi." });
+  }
+
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const isSuperAdmin =
+    SUPER_ADMIN_EMAILS_SERVER.includes(cleanEmail) ||
+    cleanEmail === DEFAULT_CREATOR_EMAIL ||
+    userId === DEFAULT_CREATOR_UID;
+
+  const db = getDatabase();
+  const effectiveUserId = userId || "guest";
+  const { sub } = resolveUserAndSubscription(db, effectiveUserId);
+  const isPremiumActive = sub.status === "PREMIUM_ACTIVE";
+
+  if (!isSuperAdmin && !isPremiumActive) {
+    const user = db.users[effectiveUserId];
+    if (user?.aiVideoAdTrial?.used === true) {
+      return res.status(403).json({
+        error: "Kesempatan Gratis Anda Telah Digunakan. Silakan upgrade ke Premium untuk membuat video iklan berikutnya.",
+        code: "TRIAL_ALREADY_USED",
+      });
+    }
   }
 
   const videoApiKey =
@@ -2977,9 +3335,6 @@ app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Respo
     process.env.GEMINI_API_KEY;
 
   if (!videoApiKey) {
-    if (activeVideoAdLocks[effectiveUserId]) {
-      delete activeVideoAdLocks[effectiveUserId];
-    }
     return res.status(503).json({
       success: false,
       code: "VIDEO_API_UNAVAILABLE",
@@ -2989,148 +3344,24 @@ app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Respo
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: videoApiKey });
-    const targetAspect = ratio === "16:9" ? "16:9" : "9:16";
+    activeVideoAdLocks[effectiveUserId] = Date.now();
 
-    // Attempt invoking the real video generation model (Google Veo)
-    // Model candidates: veo-3.1-fast-generate-preview -> veo-3.1-lite-generate-preview -> veo-3.1-generate-preview
-    let videoOperation: any = null;
-    let usedModel = "veo-3.1-fast-generate-preview";
-
-    const hookScene = scenes[0] || {};
-    const primaryPrompt =
-      hookScene.videoPrompt ||
-      `Cinematic commercial video for ${productName}, photorealistic human model presenting the product with dynamic camera movement, 4k, 24fps`;
-
-    console.log(`[ARVIN AI] Calling Video Generation Model (${usedModel}) for real video clips...`);
-
-    try {
-      videoOperation = await ai.models.generateVideos({
-        model: usedModel,
-        prompt: primaryPrompt,
-        config: {
-          numberOfVideos: 1,
-          resolution: "720p",
-          aspectRatio: targetAspect,
-        },
-      });
-    } catch (veoErr: any) {
-      console.warn(`[ARVIN AI] ${usedModel} call failed:`, veoErr?.message);
-      // Try fallback to veo-3.1-lite-generate-preview
-      usedModel = "veo-3.1-lite-generate-preview";
-      try {
-        videoOperation = await ai.models.generateVideos({
-          model: usedModel,
-          prompt: primaryPrompt,
-          config: {
-            numberOfVideos: 1,
-            resolution: "720p",
-            aspectRatio: targetAspect,
-          },
-        });
-      } catch (liteErr: any) {
-        console.warn(`[ARVIN AI] ${usedModel} fallback call failed:`, liteErr?.message);
-
-        // RELEASE LOCK AND ENFORCE ANTI-SLIDESHOW MANDATE
-        if (activeVideoAdLocks[effectiveUserId]) {
-          delete activeVideoAdLocks[effectiveUserId];
-        }
-
-        const isQuotaErr =
-          liteErr?.message?.includes("429") ||
-          liteErr?.message?.includes("quota") ||
-          liteErr?.message?.includes("RESOURCE_EXHAUSTED");
-
-        return res.status(503).json({
-          success: false,
-          code: "VIDEO_API_UNAVAILABLE",
-          error: isQuotaErr
-            ? "AI Video Generation belum tersedia atau kuota video API belum aktif. Silakan periksa konfigurasi video-generation API."
-            : "AI Video Generation gagal dipanggil. Silakan periksa konfigurasi video-generation API.",
-          details: liteErr?.message || "Model video generation saat ini tidak dapat merespons permintaan video.",
-          trialUsed: false,
-          antiSlideshowEnforced: true,
-        });
-      }
-    }
-
-    if (!videoOperation || !videoOperation.name) {
-      if (activeVideoAdLocks[effectiveUserId]) {
-        delete activeVideoAdLocks[effectiveUserId];
-      }
-      return res.status(503).json({
-        success: false,
-        code: "VIDEO_API_UNAVAILABLE",
-        error: "AI Video Generation belum tersedia atau gagal diproses. Silakan periksa konfigurasi video-generation API.",
-        trialUsed: false,
-      });
-    }
-
-    // Poll operation until video is completed
-    console.log(`[ARVIN AI] Video generation operation initiated: ${videoOperation.name}. Polling status...`);
-    const op = new GenerateVideosOperation();
-    op.name = videoOperation.name;
-
-    let updatedOp = await ai.operations.getVideosOperation({ operation: op });
-    let attempts = 0;
-    const maxAttempts = 60; // Up to 5 minutes
-    while (!updatedOp.done && attempts < maxAttempts) {
-      await new Promise((r) => setTimeout(r, 5000));
-      updatedOp = await ai.operations.getVideosOperation({ operation: op });
-      attempts++;
-    }
-
-    if (!updatedOp.done) {
-      throw new Error("Proses video generation melebihi batas waktu (timeout). Silakan coba lagi.");
-    }
-
-    const downloadUri = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
-    if (!downloadUri) {
-      throw new Error("URI video hasil generate tidak ditemukan.");
-    }
-
-    // Download video file bytes
-    console.log(`[ARVIN AI] Downloading generated video from ${downloadUri}...`);
-    const videoRes = await fetch(downloadUri, {
-      headers: { "x-goog-api-key": videoApiKey },
+    const result = await executeVeoVideoGeneration({
+      apiKey: videoApiKey,
+      productName: productName.trim(),
+      duration,
+      ratio,
+      scenes,
     });
 
-    if (!videoRes.ok) {
-      throw new Error(`Gagal mengunduh file video: status ${videoRes.status}`);
-    }
-
-    const arrayBuffer = await videoRes.arrayBuffer();
-    const videoBuffer = Buffer.from(arrayBuffer);
-
-    const videoId = `ad_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const outputFilename = `${videoId}.mp4`;
-    const outputPath = path.join(VIDEO_UPLOADS_DIR, outputFilename);
-
-    fs.writeFileSync(outputPath, videoBuffer);
-    console.log(`[ARVIN AI] Saved real generated video to ${outputPath} (${videoBuffer.length} bytes)`);
-
-    // Verify video with ffprobe
-    try {
-      const probeOutput = execSync(
-        `ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1:nokey=1 "${outputPath}"`,
-        { encoding: "utf-8" }
-      );
-      console.log(`[ARVIN AI] FFprobe verified video: ${probeOutput.trim()}`);
-    } catch (probeErr) {
-      console.warn("[ARVIN AI] FFprobe warning (proceeding):", probeErr);
-    }
-
-    // Release lock upon generation success
     if (activeVideoAdLocks[effectiveUserId]) {
       delete activeVideoAdLocks[effectiveUserId];
     }
 
-    const videoUrl = `/uploads/videos/${outputFilename}`;
-
     res.json({
       success: true,
       isRealVideo: true,
-      videoUrl,
+      videoUrl: result.videoUrl,
       totalDuration: Number(duration),
       productName: productName.trim(),
       scenes,
@@ -3143,12 +3374,14 @@ app.post("/api/ai-video-ad/generate-real-video", async (req: Request, res: Respo
     }
     console.error("[ARVIN AI] Error in /api/ai-video-ad/generate-real-video:", err?.message || err);
 
-    return res.status(500).json({
+    return res.status(503).json({
       success: false,
       code: "VIDEO_GEN_FAILED",
-      error: "AI Video Generation belum tersedia atau gagal diproses. Silakan periksa konfigurasi video-generation API.",
-      details: err?.message || "Terjadi kesalahan internal saat memproses video.",
+      stage: err?.stage || "Video Generation",
+      error: err?.message || "AI Video Generation gagal. Tidak ada video yang berhasil dibuat.",
+      details: err?.details || err?.message || "Terjadi kendala teknis saat memproses video.",
       trialUsed: false,
+      antiSlideshowEnforced: true,
     });
   }
 });

@@ -3,24 +3,25 @@ import {
   Sparkles,
   Video,
   Play,
-  Pause,
   RotateCcw,
   Download,
   Upload,
   Image as ImageIcon,
   CheckCircle2,
   AlertCircle,
+  AlertOctagon,
   Crown,
-  ShieldCheck,
-  ChevronRight,
-  Sliders,
-  Volume2,
-  VolumeX,
-  Share2,
-  Lock,
-  ArrowRight,
   Film,
   Zap,
+  Clock,
+  Layers,
+  Camera,
+  User,
+  Package,
+  RefreshCw,
+  Eye,
+  Sliders,
+  Check,
 } from 'lucide-react';
 import {
   checkAiVideoAdAccess,
@@ -28,7 +29,7 @@ import {
   releaseAiVideoAdLock,
   consumeAiVideoAdTrial,
 } from '../../services/accessControlService';
-import { AiVideoAdAccessCheck, GeneratedAiVideoAd, AiVideoAdScene } from '../../types';
+import { AiVideoAdAccessCheck, GeneratedAiVideoAd, AiVideoAdScene, AiVideoAdScriptPlan } from '../../types';
 
 interface AiVideoAdViewProps {
   onUpgrade: () => void;
@@ -36,17 +37,67 @@ interface AiVideoAdViewProps {
   currentUser?: any;
 }
 
-const DEFAULT_MODEL_PHOTO =
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80';
-const DEFAULT_PRODUCT_PHOTO =
-  'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&auto=format&fit=crop&q=80';
+const PRESET_MODELS = [
+  {
+    id: 'model-1',
+    label: 'Kreator Wanita Kasual',
+    url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'model-2',
+    label: 'Kreator Pria Dinamis',
+    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'model-3',
+    label: 'Kreator Hijab Modis',
+    url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'model-4',
+    label: 'Kreator Profesional',
+    url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&auto=format&fit=crop&q=80',
+  },
+];
+
+const PRESET_PRODUCTS = [
+  {
+    id: 'prod-1',
+    label: 'Serum & Skincare',
+    url: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'prod-2',
+    label: 'Fashion & Apparel',
+    url: 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'prod-3',
+    label: 'Gadget & Audio',
+    url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'prod-4',
+    label: 'Kopi & Minuman Sehat',
+    url: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80',
+  },
+];
+
+const AD_STYLES = [
+  'Trendy TikTok & Reels',
+  'UGC / Review Jujur',
+  'Cinematic Commercial',
+  'Hard Selling & Promo Gila',
+  'Storytelling & Edukasi',
+  'Problem - Solution Focus',
+];
 
 export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
   onUpgrade,
   onNavigateToEditVideo,
   currentUser,
 }) => {
-  // Access state
+  // Access control
   const [accessState, setAccessState] = useState<AiVideoAdAccessCheck>({
     allowed: false,
     isSuperAdmin: false,
@@ -57,63 +108,68 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
   });
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
-  // Form inputs
+  // Form states
   const [productName, setProductName] = useState('');
   const [productDescription, setProductDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [promo, setPromo] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
+  const [callToAction, setCallToAction] = useState('Beli Sekarang Sebelum Promo Berakhir!');
+  const [duration, setDuration] = useState<30 | 60>(30);
   const [adStyle, setAdStyle] = useState('Trendy TikTok & Reels');
   const [ratio, setRatio] = useState<'9:16' | '1:1' | '16:9'>('9:16');
-  const [duration, setDuration] = useState<number>(15);
 
-  // Photos
-  const [modelPhoto, setModelPhoto] = useState<string>(DEFAULT_MODEL_PHOTO);
-  const [productPhoto, setProductPhoto] = useState<string>(DEFAULT_PRODUCT_PHOTO);
+  // Visual Assets
+  const [modelPhoto, setModelPhoto] = useState<string>(PRESET_MODELS[0].url);
+  const [productPhoto, setProductPhoto] = useState<string>(PRESET_PRODUCTS[0].url);
 
-  // Generation state
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationStep, setGenerationStep] = useState('');
-  const [generationError, setGenerationError] = useState<string | null>(null);
+  // Workflow Stages
+  // 'IDLE' | 'PLANNING_SCRIPT' | 'SCRIPT_READY' | 'GENERATING_VIDEO' | 'VIDEO_READY' | 'ERROR'
+  const [workflowStatus, setWorkflowStatus] = useState<
+    'IDLE' | 'PLANNING_SCRIPT' | 'SCRIPT_READY' | 'GENERATING_VIDEO' | 'VIDEO_READY' | 'ERROR'
+  >('IDLE');
 
-  // Generated ad result
+  // Script plan from Tahap 2
+  const [scriptPlan, setScriptPlan] = useState<AiVideoAdScriptPlan | null>(null);
+
+  // Real Video Generation Progress tracking
+  const [generationStageText, setGenerationStageText] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const pollingTimerRef = useRef<any>(null);
+
+  // Error details (Strictly no photo fallback!)
+  const [errorDetails, setErrorDetails] = useState<{
+    stage: string;
+    message: string;
+    details?: string;
+  } | null>(null);
+
+  // Generated Real Video Result
   const [generatedAd, setGeneratedAd] = useState<GeneratedAiVideoAd | null>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
 
-  // Player state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
-  const [playbackProgress, setPlaybackProgress] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-
-  // Audio Context ref
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const audioTimerRef = useRef<any>(null);
-  const playbackIntervalRef = useRef<any>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Check access on mount
+  // Load Access State
   useEffect(() => {
     let isMounted = true;
-
     async function loadAccess() {
       setIsCheckingAccess(true);
       try {
-        const result = await checkAiVideoAdAccess(currentUser?.uid);
+        const res = await checkAiVideoAdAccess(currentUser?.uid);
         if (isMounted) {
-          setAccessState(result);
+          setAccessState(res);
         }
       } catch (err) {
-        console.warn('Error loading AI video ad access:', err);
+        console.warn('Error loading access:', err);
       } finally {
         if (isMounted) {
           setIsCheckingAccess(false);
         }
       }
     }
-
     loadAccess();
     return () => {
       isMounted = false;
+      if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
     };
   }, [currentUser?.uid]);
 
@@ -142,38 +198,19 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Generate AI Video Ad
-  const handleGenerate = async () => {
+  // TAHAP 2: AI Planning & Scripting
+  const handlePlanScript = async () => {
     if (!productName.trim()) {
-      setGenerationError('Silakan masukkan nama produk terlebih dahulu.');
+      alert('Silakan masukkan nama produk terlebih dahulu.');
       return;
     }
 
-    // 1. Check access and lock
-    setGenerationError(null);
-    setIsGenerating(true);
-    setGenerationStep('Memeriksa hak akses & kuota...');
+    setErrorDetails(null);
+    setWorkflowStatus('PLANNING_SCRIPT');
+    setGenerationStageText('Menganalisis produk & menyusun konsep iklan...');
 
     try {
-      const lockRes = await acquireAiVideoAdLock(currentUser?.uid);
-      if (!lockRes.acquired) {
-        setIsGenerating(false);
-        setGenerationError(
-          lockRes.error ||
-            'Kesempatan Gratis Anda Telah Digunakan. Silakan upgrade ke Premium.'
-        );
-        return;
-      }
-
-      setGenerationStep('Menganalisis profil produk & audiens sasaran...');
-      await new Promise((r) => setTimeout(r, 600));
-
-      setGenerationStep('Menyusun hook 3 detik & narasi copywriting...');
-      await new Promise((r) => setTimeout(r, 800));
-
-      setGenerationStep('Merangkai visual foto model & produk ke dalam scene...');
-
-      const response = await fetch('/api/ai-video-ad/generate', {
+      const response = await fetch('/api/ai-video-ad/plan-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,7 +218,10 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
           email: currentUser?.email,
           productName: productName.trim(),
           productDescription: productDescription.trim(),
+          price: price.trim(),
+          promo: promo.trim(),
           targetAudience: targetAudience.trim(),
+          callToAction: callToAction.trim(),
           style: adStyle,
           duration,
           ratio,
@@ -191,722 +231,603 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error ||
-            'Gagal membuat video iklan. Trial Anda TIDAK berkurang. Silakan coba lagi.'
-        );
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Gagal menyusun naskah dan scene plan AI.');
       }
 
       const data = await response.json();
-      if (!data.ad || !Array.isArray(data.ad.scenes) || data.ad.scenes.length === 0) {
-        throw new Error('Respons format video iklan tidak valid.');
+      if (!data.plan || !Array.isArray(data.plan.scenes) || data.plan.scenes.length === 0) {
+        throw new Error('Format naskah dari AI tidak valid.');
       }
 
-      setGenerationStep('Menyiapkan pemutar video dan audio musik...');
-      await new Promise((r) => setTimeout(r, 500));
-
-      const newAd: GeneratedAiVideoAd = {
-        ...data.ad,
-        modelPhotoUrl: modelPhoto,
-        productPhotoUrl: productPhoto,
-      };
-
-      setGeneratedAd(newAd);
-      setCurrentSceneIndex(0);
-      setPlaybackProgress(0);
-
-      // KONSUMSI TRIAL: Hanya jika video sudah BERHASIL DIGENERATE dan siap diputar!
-      try {
-        await consumeAiVideoAdTrial(currentUser?.uid, {
-          productName: newAd.productName,
-          style: newAd.style,
-          duration: newAd.totalDuration,
-        });
-        // Perbarui status akses lokal menjadi trialUsed = true
-        if (!accessState.isSuperAdmin && !accessState.isPremium) {
-          setAccessState((prev) => ({
-            ...prev,
-            allowed: false,
-            trialUsed: true,
-            remaining: 0,
-            reason: 'FREE_TRIAL_EXHAUSTED',
-          }));
-        }
-      } catch (consumeErr) {
-        console.warn('Notice: Trial consumption sync error:', consumeErr);
-      }
-
-      setIsGenerating(false);
-      setIsPlaying(true);
+      setScriptPlan(data.plan);
+      setWorkflowStatus('SCRIPT_READY');
     } catch (err: any) {
-      console.error('Error generating AI video ad:', err);
-      // Trial TIDAK berkurang jika gagal! Release lock
-      await releaseAiVideoAdLock(currentUser?.uid);
-      setIsGenerating(false);
-      setGenerationError(
-        err?.message ||
-          'Terjadi kendala saat generate video iklan. Trial Anda TIDAK berkurang. Silakan coba lagi.'
-      );
+      console.error('Error planning script:', err);
+      setErrorDetails({
+        stage: 'AI Planning & Scripting',
+        message: err?.message || 'Gagal menyusun naskah iklan.',
+        details: 'Pastikan koneksi internet stabil dan data produk telah terisi.',
+      });
+      setWorkflowStatus('ERROR');
     }
   };
 
-  // Play commercial synth audio via Web Audio API
-  const startSynthBgm = () => {
-    if (isMuted) return;
-    try {
-      if (!audioCtxRef.current) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        audioCtxRef.current = new AudioCtx();
-      }
-
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-
-      // Upbeat commercial arpeggio chords
-      const notes = [261.63, 329.63, 392.0, 523.25, 659.25, 783.99];
-      let step = 0;
-
-      const playBeep = () => {
-        if (!isPlaying || isMuted || !audioCtxRef.current) return;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = 'triangle';
-        const freq = notes[step % notes.length];
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-
-        gain.gain.setValueAtTime(0.06, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start();
-        osc.stop(ctx.currentTime + 0.3);
-
-        step++;
-        audioTimerRef.current = setTimeout(playBeep, 240);
-      };
-
-      playBeep();
-    } catch (e) {
-      console.warn('Audio synthesis disabled or blocked:', e);
-    }
-  };
-
-  const stopSynthBgm = () => {
-    if (audioTimerRef.current) {
-      clearTimeout(audioTimerRef.current);
-      audioTimerRef.current = null;
-    }
-  };
-
-  // Player timer loop
-  useEffect(() => {
-    if (!isPlaying || !generatedAd || generatedAd.scenes.length === 0) {
-      stopSynthBgm();
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-      }
+  // TAHAP 3 & 4: Real Video Generation & Progress Polling
+  const handleGenerateRealVideo = async () => {
+    if (!scriptPlan) {
+      await handlePlanScript();
       return;
     }
 
-    startSynthBgm();
-
-    const totalSeconds = generatedAd.totalDuration || 15;
-    const intervalMs = 100;
-    const progressStep = (intervalMs / (totalSeconds * 1000)) * 100;
-
-    playbackIntervalRef.current = setInterval(() => {
-      setPlaybackProgress((prev) => {
-        const nextProgress = prev + progressStep;
-        if (nextProgress >= 100) {
-          // Loop back to start
-          setCurrentSceneIndex(0);
-          return 0;
-        }
-
-        // Calculate active scene
-        const currentTime = (nextProgress / 100) * totalSeconds;
-        let accum = 0;
-        for (let i = 0; i < generatedAd.scenes.length; i++) {
-          accum += generatedAd.scenes[i].duration;
-          if (currentTime <= accum) {
-            setCurrentSceneIndex(i);
-            break;
-          }
-        }
-
-        return nextProgress;
-      });
-    }, intervalMs);
-
-    return () => {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-      }
-      stopSynthBgm();
-    };
-  }, [isPlaying, generatedAd, isMuted]);
-
-  // Export video via HTML5 Canvas + MediaRecorder
-  const handleExport = async () => {
-    if (!generatedAd) return;
-    setIsExporting(true);
-    setExportProgress(0);
+    setErrorDetails(null);
+    setWorkflowStatus('GENERATING_VIDEO');
+    setGenerationStageText('Menyiapkan job pembuatan video...');
 
     try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas 2D context tidak tersedia');
-
-      const width = ratio === '9:16' ? 720 : ratio === '1:1' ? 720 : 1280;
-      const height = ratio === '9:16' ? 1280 : ratio === '1:1' ? 720 : 720;
-      canvas.width = width;
-      canvas.height = height;
-
-      // Preload images
-      const loadImg = (src: string) =>
-        new Promise<HTMLImageElement>((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => resolve(img);
-          img.onerror = () => resolve(img);
-          img.src = src;
-        });
-
-      const modelImg = await loadImg(generatedAd.modelPhotoUrl || DEFAULT_MODEL_PHOTO);
-      const prodImg = await loadImg(generatedAd.productPhotoUrl || DEFAULT_PRODUCT_PHOTO);
-
-      const stream = canvas.captureStream(30);
-
-      let recorder: MediaRecorder;
-      try {
-        recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-      } catch {
-        recorder = new MediaRecorder(stream);
+      // 1. Acquire client lock
+      const lockRes = await acquireAiVideoAdLock(currentUser?.uid);
+      if (!lockRes.acquired) {
+        throw new Error(lockRes.error || 'Kesempatan gratis telah digunakan.');
       }
 
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
+      // 2. Create Video Generation Job
+      setGenerationStageText('Menghubungkan ke Video Generation Engine (Google Veo)...');
+      const createRes = await fetch('/api/ai-video-ad/job/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser?.uid,
+          email: currentUser?.email,
+          productName: scriptPlan.productName,
+          duration: scriptPlan.duration,
+          ratio: scriptPlan.ratio,
+          scenes: scriptPlan.scenes,
+          modelPhotoUrl: modelPhoto,
+          productPhotoUrl: productPhoto,
+          price: scriptPlan.price,
+          promo: scriptPlan.promo,
+          style: scriptPlan.style,
+        }),
+      });
 
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `arvin_iklan_${generatedAd.productName.toLowerCase().replace(/\s+/g, '_')}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setIsExporting(false);
-        setExportProgress(100);
-      };
+      if (!createRes.ok) {
+        const createErr = await createRes.json().catch(() => ({}));
+        const errObj = new Error(createErr.error || 'Gagal membuat antrean video.');
+        (errObj as any).stage = createErr.stage || 'Video Generation Engine';
+        (errObj as any).details = createErr.details;
+        throw errObj;
+      }
 
-      recorder.start();
+      const createData = await createRes.json();
+      const currentJobId = createData.jobId;
+      setJobId(currentJobId);
 
-      const totalDurationSec = generatedAd.totalDuration || 15;
-      const totalFrames = totalDurationSec * 30;
-      let frame = 0;
+      // 3. Poll Job Status
+      let pollAttempts = 0;
+      const maxPollAttempts = 120; // 5 minutes max
 
-      const renderFrame = () => {
-        if (frame >= totalFrames) {
-          recorder.stop();
+      if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+
+      pollingTimerRef.current = setInterval(async () => {
+        pollAttempts++;
+        if (pollAttempts > maxPollAttempts) {
+          clearInterval(pollingTimerRef.current);
+          await releaseAiVideoAdLock(currentUser?.uid);
+          setErrorDetails({
+            stage: 'Video Rendering Timeout',
+            message: 'AI Video Generation melebihi batas waktu maksimal (timeout).',
+            details: 'Trial Anda TIDAK berkurang. Silakan coba lagi nanti.',
+          });
+          setWorkflowStatus('ERROR');
           return;
         }
 
-        const currentTimeSec = (frame / totalFrames) * totalDurationSec;
-        let activeIdx = 0;
-        let accumTime = 0;
-        for (let i = 0; i < generatedAd.scenes.length; i++) {
-          accumTime += generatedAd.scenes[i].duration;
-          if (currentTimeSec <= accumTime) {
-            activeIdx = i;
-            break;
+        try {
+          const statusRes = await fetch(`/api/ai-video-ad/job/status?jobId=${currentJobId}`);
+          if (!statusRes.ok) return;
+
+          const statusData = await statusRes.json();
+          const job = statusData.job;
+
+          if (!job) return;
+
+          // Update stage text in UI (No fake percentages!)
+          if (job.step) {
+            setGenerationStageText(job.step);
           }
-        }
-        const activeScene = generatedAd.scenes[activeIdx] || generatedAd.scenes[0];
 
-        // Draw background gradient
-        const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-        bgGrad.addColorStop(0, '#0f172a');
-        bgGrad.addColorStop(1, '#1e293b');
-        ctx.fillStyle = bgGrad;
-        ctx.fillRect(0, 0, width, height);
+          // Case: COMPLETED
+          if (job.status === 'COMPLETED' && job.videoUrl) {
+            clearInterval(pollingTimerRef.current);
 
-        // Draw main media
-        const currentImg = activeScene.visualFocus === 'model' ? modelImg : prodImg;
-        if (currentImg && currentImg.complete && currentImg.naturalWidth > 0) {
-          const imgAspect = currentImg.naturalWidth / currentImg.naturalHeight;
-          const canvasAspect = width / height;
-          let drawW = width;
-          let drawH = height;
-          let offX = 0;
-          let offY = 0;
+            // Validate that result is indeed a real video
+            const adResult: GeneratedAiVideoAd = {
+              id: job.id,
+              productName: job.productName,
+              productDescription: scriptPlan.productDescription,
+              price: scriptPlan.price,
+              promo: scriptPlan.promo,
+              targetAudience: scriptPlan.targetAudience,
+              style: scriptPlan.style,
+              ratio: scriptPlan.ratio,
+              totalDuration: job.totalDuration || scriptPlan.duration,
+              headlineHook: scriptPlan.headlineHook,
+              fullCopywritingScript: scriptPlan.fullCopywritingScript,
+              callToAction: scriptPlan.callToAction,
+              videoUrl: job.videoUrl,
+              isRealVideo: true,
+              modelPhotoUrl: modelPhoto,
+              productPhotoUrl: productPhoto,
+              scenes: job.scenes || scriptPlan.scenes,
+              createdAt: new Date().toISOString(),
+            };
 
-          if (imgAspect > canvasAspect) {
-            drawW = height * imgAspect;
-            offX = (width - drawW) / 2;
-          } else {
-            drawH = width / imgAspect;
-            offY = (height - drawH) / 2;
+            setGeneratedAd(adResult);
+            setWorkflowStatus('VIDEO_READY');
+
+            // Consume trial strictly upon real video success!
+            try {
+              await consumeAiVideoAdTrial(currentUser?.uid, {
+                productName: adResult.productName,
+                style: adResult.style,
+                duration: adResult.totalDuration,
+              });
+              await fetch('/api/ai-video-ad/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: currentUser?.uid,
+                  productName: adResult.productName,
+                  now: new Date().toISOString(),
+                }),
+              });
+              if (!accessState.isSuperAdmin && !accessState.isPremium) {
+                setAccessState((prev) => ({
+                  ...prev,
+                  allowed: false,
+                  trialUsed: true,
+                  remaining: 0,
+                  reason: 'FREE_TRIAL_EXHAUSTED',
+                }));
+              }
+            } catch (syncErr) {
+              console.warn('Notice syncing trial:', syncErr);
+            }
           }
-          ctx.drawImage(currentImg, offX, offY, drawW, drawH);
+
+          // Case: FAILED
+          if (job.status === 'FAILED') {
+            clearInterval(pollingTimerRef.current);
+            await releaseAiVideoAdLock(currentUser?.uid);
+
+            // MANDATE: STRICTLY NO PHOTO SLIDESHOW FALLBACK!
+            setErrorDetails({
+              stage: job.errorStage || 'Video Generation',
+              message: job.error || 'AI Video Generation gagal. Tidak ada video yang berhasil dibuat.',
+              details: job.errorDetails || 'Model video generator tidak dapat memproses klip.',
+            });
+            setWorkflowStatus('ERROR');
+          }
+        } catch (pollErr) {
+          console.warn('Polling error:', pollErr);
         }
-
-        // Dark gradient overlay for text readability
-        const grad = ctx.createLinearGradient(0, height * 0.4, 0, height);
-        grad.addColorStop(0, 'rgba(15, 23, 42, 0)');
-        grad.addColorStop(0.7, 'rgba(15, 23, 42, 0.85)');
-        grad.addColorStop(1, 'rgba(15, 23, 42, 0.98)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, width, height);
-
-        // Draw Badge
-        if (activeScene.badgeText) {
-          ctx.fillStyle = activeScene.badgeColor || '#ef4444';
-          ctx.beginPath();
-          ctx.roundRect(40, 50, 220, 48, 24);
-          ctx.fill();
-
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 20px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(activeScene.badgeText.toUpperCase(), 150, 82);
-        }
-
-        // Draw Headline
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(activeScene.headline || generatedAd.headlineHook, 40, height - 160);
-
-        // Draw Subheadline / Voiceover
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '22px sans-serif';
-        ctx.fillText(activeScene.subheadline || activeScene.voiceoverScript, 40, height - 110);
-
-        // Draw Brand Tag
-        ctx.fillStyle = '#38bdf8';
-        ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(`ARVIN STUDIO • ${generatedAd.productName}`, 40, height - 50);
-
-        frame++;
-        setExportProgress(Math.round((frame / totalFrames) * 100));
-        setTimeout(renderFrame, 1000 / 30);
-      };
-
-      renderFrame();
+      }, 3000);
     } catch (err: any) {
-      console.error('Export failed:', err);
-      setIsExporting(false);
-      alert('Gagal mengekspor video iklan: ' + err?.message);
+      console.error('Error starting video generation:', err);
+      if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+      await releaseAiVideoAdLock(currentUser?.uid);
+
+      // STRICTLY NO FALLBACK TO PHOTO SLIDESHOW
+      setErrorDetails({
+        stage: err?.stage || 'Video Generation Engine',
+        message: err?.message || 'AI Video Generation gagal diproses.',
+        details: err?.details || 'Trial Anda TIDAK berkurang. Silakan coba lagi.',
+      });
+      setWorkflowStatus('ERROR');
     }
   };
 
-  const activeScene: AiVideoAdScene | undefined =
-    generatedAd?.scenes[currentSceneIndex] || generatedAd?.scenes[0];
+  // Reset to form
+  const handleResetToForm = () => {
+    if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+    setErrorDetails(null);
+    setWorkflowStatus('IDLE');
+  };
+
+  // Download real MP4
+  const handleDownloadMp4 = () => {
+    if (!generatedAd?.videoUrl) return;
+    const a = document.createElement('a');
+    a.href = generatedAd.videoUrl;
+    a.download = `${productName.trim() || 'video_iklan'}_arvin_ai.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   return (
-    <div id="ai-video-ad-container" className="w-full max-w-7xl mx-auto px-4 py-6 sm:py-8">
+    <div id="ai-video-ad-view" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 font-sans">
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-600/10 text-blue-600 rounded-xl">
-              <Video className="w-6 h-6" />
+            <span className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Film className="w-5 h-5" />
             </span>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
               AI Video Iklan
             </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              Real AI Video Engine
+            </span>
           </div>
-          <p className="text-sm text-slate-600 mt-1 max-w-2xl">
-            Rancang video promosi komersial dengan foto model & produk berkualitas tinggi, hook
-            pembuka 3 detik, naskah suara viral, dan susunan scene berkonversi tinggi.
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Buat video iklan komersial fotorealistik untuk TikTok, Reels, dan Shorts dengan AI Video Generation.
           </p>
         </div>
 
-        {/* ACCESS BADGE */}
-        <div className="flex items-center gap-3">
+        {/* ACCESS STATUS PILL */}
+        <div className="flex items-center gap-2">
           {accessState.isSuperAdmin ? (
-            <div
-              id="badge-superadmin"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-purple-100 border border-purple-300 text-purple-800 text-xs font-bold"
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-600" />
-              SUPER ADMIN BYPASS (Akses Penuh)
+            <div className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+              <Crown className="w-4 h-4 text-amber-600" />
+              <span>Super Admin (Akses Penuh)</span>
             </div>
           ) : accessState.isPremium ? (
-            <div
-              id="badge-premium"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-xs font-bold"
-            >
-              <Crown className="w-4 h-4 text-amber-600" />
-              PREMIUM AKTIF (Tanpa Batas)
-            </div>
-          ) : accessState.trialUsed ? (
-            <div
-              id="badge-free-exhausted"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-100 border border-rose-300 text-rose-800 text-xs font-bold"
-            >
-              <Lock className="w-4 h-4 text-rose-600" />
-              Trial Seumur Hidup: 0× Tersisa
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+              <Zap className="w-4 h-4 text-emerald-600" />
+              <span>Premium Member (Unlimited)</span>
             </div>
           ) : (
-            <div
-              id="badge-free-available"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold"
-            >
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              Kesempatan Gratis 1× SEUMUR HIDUP
+            <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>
+                Trial Gratis:{' '}
+                <strong className={accessState.trialUsed ? 'text-rose-600' : 'text-blue-700'}>
+                  {accessState.trialUsed ? '0/1 (Habis)' : '1× Lifetime'}
+                </strong>
+              </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* BANNER 1: FREE TRIAL EXHAUSTED BANNER (MANDATORY REQUIREMENT) */}
-      {!accessState.isSuperAdmin && !accessState.isPremium && accessState.trialUsed && (
-        <div
-          id="trial-exhausted-lock-card"
-          className="mt-6 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-rose-50 via-amber-50 to-orange-50 border-2 border-rose-200 shadow-lg text-center flex flex-col items-center"
-        >
-          <div className="w-16 h-16 bg-rose-600 text-white rounded-2xl flex items-center justify-center shadow-md mb-4">
-            <Lock className="w-8 h-8" />
-          </div>
-
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Kesempatan Gratis Anda Telah Digunakan
-          </h2>
-
-          <p className="text-slate-700 text-sm sm:text-base mt-2 max-w-xl leading-relaxed">
-            Anda telah menggunakan 1× kesempatan gratis seumur hidup akun Anda untuk membuat AI Video
-            Iklan. Upgrade ke akun <strong>Premium</strong> untuk mendapatkan akses tanpa batas ke
-            semua fitur AI Video Iklan dan ekspor tanpa watermark.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-            <button
-              id="btn-upgrade-premium-trial-exhausted"
-              type="button"
-              onClick={onUpgrade}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold shadow-lg shadow-amber-500/25 hover:from-amber-600 hover:to-orange-700 transition-all flex items-center gap-2 cursor-pointer text-base"
-            >
-              <Crown className="w-5 h-5" />
-              Upgrade Premium
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* BANNER 2: FREE TRIAL AVAILABLE NOTICE */}
-      {!accessState.isSuperAdmin && !accessState.isPremium && !accessState.trialUsed && (
-        <div
-          id="trial-available-banner"
-          className="mt-6 p-4 rounded-xl bg-blue-50 border border-blue-200 flex items-start sm:items-center gap-3"
-        >
-          <Sparkles className="w-5 h-5 text-blue-600 shrink-0 mt-0.5 sm:mt-0" />
-          <div className="flex-1 text-sm text-blue-900">
-            <strong className="font-bold">Kesempatan Gratis 1× Seumur Hidup:</strong> Anda memiliki{' '}
-            <strong>1 kali generate gratis</strong> untuk mencoba kualitas video iklan AI komersial
-            ARVIN STUDIO. Kuota hanya akan berkurang setelah video berhasil dibuat.
-          </div>
-        </div>
-      )}
-
       {/* MAIN TWO-COLUMN WORKSPACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
-        {/* LEFT COLUMN: FORM & SETTINGS */}
-        <div className="lg:col-span-6 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* LEFT COLUMN: PARAMETERS & ASSETS */}
+        <div className="lg:col-span-6 flex flex-col gap-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs">
-            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Sliders className="w-5 h-5 text-blue-600" />
-              Pengaturan Video Iklan
+            <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-blue-600" />
+              Konfigurasi Iklan & Asset Visual
             </h2>
 
-            {/* Nama Produk */}
-            <div className="mb-4">
-              <label
-                htmlFor="input-product-name"
-                className="block text-sm font-semibold text-slate-800 mb-1.5"
-              >
-                Nama Produk / Jasa <span className="text-rose-500">*</span>
-              </label>
-              <input
-                id="input-product-name"
-                type="text"
-                disabled={!accessState.allowed || isGenerating}
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="Contoh: Glowing Serum Vit C ARVIN, Kopi Robusta Premium..."
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
-              />
-            </div>
-
-            {/* Deskripsi & Keunggulan */}
-            <div className="mb-4">
-              <label
-                htmlFor="input-product-desc"
-                className="block text-sm font-semibold text-slate-800 mb-1.5"
-              >
-                Keunggulan Produk / Promo Diskon
-              </label>
-              <textarea
-                id="input-product-desc"
-                rows={3}
-                disabled={!accessState.allowed || isGenerating}
-                value={productDescription}
-                onChange={(e) => setProductDescription(e.target.value)}
-                placeholder="Contoh: Mencerahkan kulit dalam 7 hari, bahan alami organik, diskon 50% untuk 100 pembeli pertama..."
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 resize-none"
-              />
-            </div>
-
-            {/* Target Audiens */}
-            <div className="mb-4">
-              <label
-                htmlFor="input-target-audience"
-                className="block text-sm font-semibold text-slate-800 mb-1.5"
-              >
-                Target Audiens
-              </label>
-              <input
-                id="input-target-audience"
-                type="text"
-                disabled={!accessState.allowed || isGenerating}
-                value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
-                placeholder="Contoh: Wanita 18-35 tahun, pecinta skincare alami, UMKM..."
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800 disabled:bg-slate-50 disabled:text-slate-400"
-              />
-            </div>
-
-            {/* Gaya Iklan & Durasi */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-4">
+              {/* Nama Produk */}
               <div>
-                <label
-                  htmlFor="select-ad-style"
-                  className="block text-sm font-semibold text-slate-800 mb-1.5"
-                >
-                  Gaya Video Iklan
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Produk <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  id="select-ad-style"
-                  disabled={!accessState.allowed || isGenerating}
-                  value={adStyle}
-                  onChange={(e) => setAdStyle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800 disabled:bg-slate-50"
-                >
-                  <option value="Trendy TikTok & Reels">Trendy TikTok & Reels</option>
-                  <option value="Hard Selling Promo Heboh">Hard Selling Promo Heboh</option>
-                  <option value="Storytelling & Edukasi">Storytelling & Edukasi</option>
-                  <option value="Luxury & Aesthetic">Luxury & Aesthetic</option>
-                  <option value="Review Jujur Relatable">Review Jujur Relatable</option>
-                </select>
+                <input
+                  id="input-product-name"
+                  type="text"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="Contoh: GlowUp Serum Vitamin C"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  disabled={workflowStatus === 'GENERATING_VIDEO'}
+                />
               </div>
 
+              {/* Deskripsi & Keunggulan */}
               <div>
-                <label
-                  htmlFor="select-ad-duration"
-                  className="block text-sm font-semibold text-slate-800 mb-1.5"
-                >
-                  Durasi Video
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Deskripsi & Manfaat Utama Produk
                 </label>
-                <select
-                  id="select-ad-duration"
-                  disabled={!accessState.allowed || isGenerating}
-                  value={duration}
-                  onChange={(e) => setDuration(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800 disabled:bg-slate-50"
-                >
-                  <option value={15}>15 Detik (3 Scenes)</option>
-                  <option value={30}>30 Detik (5 Scenes)</option>
-                </select>
+                <textarea
+                  id="input-product-description"
+                  rows={2}
+                  value={productDescription}
+                  onChange={(e) => setProductDescription(e.target.value)}
+                  placeholder="Ceritakan keunggulan, solusi masalah, atau fitur unggulan..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  disabled={workflowStatus === 'GENERATING_VIDEO'}
+                />
               </div>
-            </div>
 
-            {/* Rasio Video */}
-            <div className="mb-6">
-              <span className="block text-sm font-semibold text-slate-800 mb-2">
-                Rasio Video
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: '9:16', label: '9:16 (Reels/TikTok)' },
-                  { id: '1:1', label: '1:1 (Persegi Feed)' },
-                  { id: '16:9', label: '16:9 (Landscape)' },
-                ].map((item) => (
+              {/* Harga & Promo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Harga Produk</label>
+                  <input
+                    id="input-product-price"
+                    type="text"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="Contoh: Rp 99.000"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    disabled={workflowStatus === 'GENERATING_VIDEO'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Promo / Diskon</label>
+                  <input
+                    id="input-product-promo"
+                    type="text"
+                    value={promo}
+                    onChange={(e) => setPromo(e.target.value)}
+                    placeholder="Contoh: Diskon 40% Hari Ini"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    disabled={workflowStatus === 'GENERATING_VIDEO'}
+                  />
+                </div>
+              </div>
+
+              {/* Target Audiens & CTA */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Target Pembeli</label>
+                  <input
+                    id="input-target-audience"
+                    type="text"
+                    value={targetAudience}
+                    onChange={(e) => setTargetAudience(e.target.value)}
+                    placeholder="Contoh: Wanita 18-35 tahun aktif"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    disabled={workflowStatus === 'GENERATING_VIDEO'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Call To Action (CTA)</label>
+                  <input
+                    id="input-cta"
+                    type="text"
+                    value={callToAction}
+                    onChange={(e) => setCallToAction(e.target.value)}
+                    placeholder="Contoh: Klik Keranjang Kuning!"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    disabled={workflowStatus === 'GENERATING_VIDEO'}
+                  />
+                </div>
+              </div>
+
+              {/* DURASI VIDEO (30s default / 60s) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Durasi Video Iklan
+                </label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    key={item.id}
-                    id={`btn-ratio-${item.id.replace(':', '-')}`}
+                    id="btn-duration-30"
                     type="button"
-                    disabled={!accessState.allowed || isGenerating}
-                    onClick={() => setRatio(item.id as any)}
-                    className={`py-2 px-2 text-xs font-semibold rounded-xl border text-center transition-all ${
-                      ratio === item.id
+                    onClick={() => setDuration(30)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      duration === 30
                         ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    {item.label}
+                    <Clock className="w-3.5 h-3.5" />
+                    30 Detik (6 Adegan)
                   </button>
-                ))}
+                  <button
+                    id="btn-duration-60"
+                    type="button"
+                    onClick={() => setDuration(60)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      duration === 60
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    60 Detik (8 Adegan)
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* FOTO MODEL & PRODUK */}
-            <div className="border-t border-slate-100 pt-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-blue-600" />
-                Asset Foto Model & Produk
-              </h3>
+              {/* Gaya & Rasio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Gaya Iklan</label>
+                  <select
+                    id="select-ad-style"
+                    value={adStyle}
+                    onChange={(e) => setAdStyle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 bg-white"
+                    disabled={workflowStatus === 'GENERATING_VIDEO'}
+                  >
+                    {AD_STYLES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Rasio Layar</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['9:16', '1:1', '16:9'] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRatio(r)}
+                        className={`py-1.5 text-center text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          ratio === r
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Upload Foto Model */}
-                <div className="border border-dashed border-slate-300 rounded-xl p-3 text-center bg-slate-50/50">
-                  <span className="text-xs font-bold text-slate-700 block mb-2">
-                    Foto Model / Kreator
+              {/* ASSET REFERENCE: FOTO MODEL & FOTO PRODUK */}
+              <div className="border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                    Asset Referensi Visual (Model & Produk)
                   </span>
-                  <div className="w-full h-32 rounded-lg overflow-hidden bg-slate-200 relative group mb-2">
-                    <img
-                      src={modelPhoto}
-                      alt="Model"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <label
-                    htmlFor="upload-model-photo"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    Ganti Foto Model
-                  </label>
-                  <input
-                    id="upload-model-photo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'model')}
-                    disabled={!accessState.allowed || isGenerating}
-                  />
+                  <span className="text-[10px] text-slate-500">Digunakan sebagai referensi AI</span>
                 </div>
 
-                {/* Upload Foto Produk */}
-                <div className="border border-dashed border-slate-300 rounded-xl p-3 text-center bg-slate-50/50">
-                  <span className="text-xs font-bold text-slate-700 block mb-2">Foto Produk</span>
-                  <div className="w-full h-32 rounded-lg overflow-hidden bg-slate-200 relative group mb-2">
-                    <img
-                      src={productPhoto}
-                      alt="Product"
-                      className="w-full h-full object-cover"
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Model Reference */}
+                  <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <span className="text-xs font-semibold text-slate-700 block mb-2">
+                      Foto Model / Kreator
+                    </span>
+                    <div className="w-full h-28 rounded-lg overflow-hidden bg-slate-200 relative mb-2">
+                      <img
+                        src={modelPhoto}
+                        alt="Model Reference"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <label
+                        htmlFor="upload-model-ref"
+                        className="flex-1 text-center py-1 px-2 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                      >
+                        Upload Foto
+                      </label>
+                      <input
+                        id="upload-model-ref"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'model')}
+                        disabled={workflowStatus === 'GENERATING_VIDEO'}
+                      />
+                    </div>
                   </div>
-                  <label
-                    htmlFor="upload-product-photo"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    Ganti Foto Produk
-                  </label>
-                  <input
-                    id="upload-product-photo"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e, 'product')}
-                    disabled={!accessState.allowed || isGenerating}
-                  />
+
+                  {/* Product Reference */}
+                  <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                    <span className="text-xs font-semibold text-slate-700 block mb-2">
+                      Foto Produk
+                    </span>
+                    <div className="w-full h-28 rounded-lg overflow-hidden bg-slate-200 relative mb-2">
+                      <img
+                        src={productPhoto}
+                        alt="Product Reference"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <label
+                        htmlFor="upload-prod-ref"
+                        className="flex-1 text-center py-1 px-2 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                      >
+                        Upload Foto
+                      </label>
+                      <input
+                        id="upload-prod-ref"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'product')}
+                        disabled={workflowStatus === 'GENERATING_VIDEO'}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* ERROR NOTIFICATION */}
-            {generationError && (
-              <div
-                id="generation-error-box"
-                className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-                <div className="flex-1 font-medium">{generationError}</div>
+              {/* ACTION BUTTONS */}
+              <div className="pt-2">
+                {!accessState.allowed && !accessState.isSuperAdmin && !accessState.isPremium ? (
+                  <button
+                    id="btn-upgrade-from-video-ad"
+                    type="button"
+                    onClick={onUpgrade}
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-sm shadow-md hover:from-amber-600 hover:to-orange-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Crown className="w-4 h-4" />
+                    Trial Habis — Upgrade ke Premium untuk Buat Video
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      id="btn-plan-script"
+                      type="button"
+                      disabled={workflowStatus === 'PLANNING_SCRIPT' || workflowStatus === 'GENERATING_VIDEO'}
+                      onClick={handlePlanScript}
+                      className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {workflowStatus === 'PLANNING_SCRIPT' ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Menyusun Naskah & Storyboard...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>1. Susun Naskah & Storyboard AI ({duration}s)</span>
+                        </>
+                      )}
+                    </button>
+
+                    {scriptPlan && (
+                      <button
+                        id="btn-generate-real-video"
+                        type="button"
+                        disabled={workflowStatus === 'GENERATING_VIDEO'}
+                        onClick={handleGenerateRealVideo}
+                        className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-sm shadow-md shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {workflowStatus === 'GENERATING_VIDEO' ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Membuat Real AI Video...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Video className="w-4 h-4" />
+                            <span>2. Generate REAL AI VIDEO (Google Veo)</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* GENERATE BUTTON */}
-            <div className="mt-6">
-              {!accessState.allowed ? (
-                <button
-                  id="btn-generate-disabled"
-                  type="button"
-                  onClick={onUpgrade}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-sm shadow-md hover:from-amber-600 hover:to-orange-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Crown className="w-4 h-4" />
-                  Upgrade Premium untuk Generate Video Iklan
-                </button>
-              ) : (
-                <button
-                  id="btn-generate-ai-video-ad"
-                  type="button"
-                  disabled={isGenerating}
-                  onClick={handleGenerate}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isGenerating ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>{generationStep || 'Memproses AI Video Iklan...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      <span>
-                        Generate AI Video Iklan{' '}
-                        {!accessState.isSuperAdmin && !accessState.isPremium
-                          ? '(1× Gratis)'
-                          : ''}
-                      </span>
-                    </>
-                  )}
-                </button>
-              )}
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: INTERACTIVE PREVIEW & RESULT */}
+        {/* RIGHT COLUMN: STORYBOARD, REAL PROGRESS, ERROR, OR REAL VIDEO PLAYER */}
         <div className="lg:col-span-6 flex flex-col items-center">
-          {generatedAd ? (
-            <div className="w-full bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col items-center">
-              <div className="w-full flex items-center justify-between mb-4">
+          {/* 1. REAL VIDEO COMPLETED & READY (TAHAP 5) */}
+          {workflowStatus === 'VIDEO_READY' && generatedAd?.videoUrl ? (
+            <div
+              id="real-video-success-container"
+              className="w-full bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col items-center"
+            >
+              <div className="w-full flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base">
-                    {generatedAd.productName}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {generatedAd.scenes.length} Scenes • {generatedAd.totalDuration} detik •{' '}
-                    {generatedAd.style}
-                  </p>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1 mb-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    REAL AI GENERATED VIDEO (MP4)
+                  </span>
+                  <h3 className="font-bold text-slate-900 text-base">{generatedAd.productName}</h3>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    id="btn-mute-toggle"
-                    type="button"
-                    onClick={() => setIsMuted(!isMuted)}
-                    className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs flex items-center gap-1 cursor-pointer"
-                    title={isMuted ? 'Nyalakan Audio' : 'Matikan Audio'}
-                  >
-                    {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </button>
-                </div>
+                <span className="text-xs font-semibold text-slate-500">
+                  {generatedAd.totalDuration}s • {generatedAd.style}
+                </span>
               </div>
 
-              {/* VIDEO PLAYER SCREEN */}
+              {/* NATIVE HTML5 VIDEO PLAYER (REAL VIDEO) */}
               <div
-                id="video-player-screen"
-                className={`relative rounded-2xl overflow-hidden bg-slate-950 shadow-xl border border-slate-800 flex flex-col justify-between ${
+                id="real-video-player-wrapper"
+                className={`relative rounded-2xl overflow-hidden bg-black shadow-xl border border-slate-800 ${
                   ratio === '9:16'
                     ? 'w-[280px] sm:w-[320px] aspect-[9/16]'
                     : ratio === '1:1'
@@ -914,121 +835,35 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
                     : 'w-full max-w-[480px] aspect-[16/9]'
                 }`}
               >
-                {/* Visual Media Background */}
-                <div className="absolute inset-0 z-0">
-                  <img
-                    src={
-                      activeScene?.visualFocus === 'model'
-                        ? generatedAd.modelPhotoUrl || DEFAULT_MODEL_PHOTO
-                        : generatedAd.productPhotoUrl || DEFAULT_PRODUCT_PHOTO
-                    }
-                    alt="Active Visual"
-                    className="w-full h-full object-cover transition-all duration-700 scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-                </div>
-
-                {/* Top Badge Overlay */}
-                <div className="relative z-10 p-4 flex items-center justify-between">
-                  {activeScene?.badgeText && (
-                    <span
-                      className="px-3 py-1 rounded-full text-[11px] font-black text-white shadow-md tracking-wider uppercase"
-                      style={{ backgroundColor: activeScene.badgeColor || '#e11d48' }}
-                    >
-                      {activeScene.badgeText}
-                    </span>
-                  )}
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-black/50 backdrop-blur-xs text-white">
-                    Scene {currentSceneIndex + 1}/{generatedAd.scenes.length}
-                  </span>
-                </div>
-
-                {/* Center Play/Pause Overlay Indicator */}
-                {!isPlaying && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
-                    <button
-                      id="btn-center-play"
-                      type="button"
-                      onClick={() => setIsPlaying(true)}
-                      className="w-16 h-16 rounded-full bg-white/90 text-slate-900 flex items-center justify-center shadow-2xl hover:scale-105 transition-all cursor-pointer"
-                    >
-                      <Play className="w-8 h-8 ml-1" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Bottom Content / Overlay Text */}
-                <div className="relative z-10 p-4 text-white">
-                  <h4 className="text-base sm:text-lg font-black leading-tight drop-shadow-md">
-                    {activeScene?.headline || generatedAd.headlineHook}
-                  </h4>
-                  <p className="text-xs text-slate-200 mt-1 drop-shadow-sm line-clamp-2">
-                    {activeScene?.subheadline || activeScene?.voiceoverScript}
-                  </p>
-
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">
-                      ARVIN STUDIO AI
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      Fokus: {activeScene?.visualFocus === 'model' ? 'Model' : 'Produk'}
-                    </span>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden mt-2">
-                    <div
-                      className="bg-blue-500 h-full transition-all duration-100"
-                      style={{ width: `${playbackProgress}%` }}
-                    />
-                  </div>
-                </div>
+                <video
+                  ref={videoPlayerRef}
+                  id="real-ai-video-player"
+                  src={generatedAd.videoUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
               </div>
 
-              {/* CONTROLS */}
-              <div className="mt-4 flex items-center gap-3">
+              {/* ACTION HANDOVER BUTTONS */}
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
                 <button
-                  id="btn-play-pause"
+                  id="btn-download-real-video"
                   type="button"
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="p-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all cursor-pointer shadow-md"
-                >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-                </button>
-                <button
-                  id="btn-replay"
-                  type="button"
-                  onClick={() => {
-                    setCurrentSceneIndex(0);
-                    setPlaybackProgress(0);
-                    setIsPlaying(true);
-                  }}
-                  className="p-3 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all cursor-pointer"
-                  title="Putar Ulang"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* ACTION BUTTONS: EXPORT & OPEN IN VIDEO EDITOR */}
-              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
-                <button
-                  id="btn-export-video-ad"
-                  type="button"
-                  disabled={isExporting}
-                  onClick={handleExport}
-                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  onClick={handleDownloadMp4}
+                  className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
                   <Download className="w-4 h-4" />
-                  {isExporting ? `Mengekspor ${exportProgress}%...` : 'Export File Video (WebM)'}
+                  Download Video (MP4)
                 </button>
 
                 {onNavigateToEditVideo && (
                   <button
-                    id="btn-open-in-editor"
+                    id="btn-open-in-video-editor"
                     type="button"
                     onClick={() => onNavigateToEditVideo(generatedAd)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     <Film className="w-4 h-4" />
                     Buka di Edit Video
@@ -1036,53 +871,209 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
                 )}
               </div>
 
-              {/* SCENE BREAKDOWN LIST */}
-              <div className="w-full mt-6 pt-5 border-t border-slate-100">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                  Urutan Scene Naskah Iklan
-                </h4>
-                <div className="space-y-2">
-                  {generatedAd.scenes.map((scene, idx) => (
-                    <div
-                      key={scene.id || idx}
-                      onClick={() => {
-                        setCurrentSceneIndex(idx);
-                        setPlaybackProgress(
-                          (idx / generatedAd.scenes.length) * 100
-                        );
-                      }}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                        currentSceneIndex === idx
-                          ? 'border-blue-500 bg-blue-50/50'
-                          : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                        <span>
-                          {scene.title || `Scene ${idx + 1}`} ({scene.duration}s)
-                        </span>
-                        <span className="text-[10px] text-slate-500">
-                          {scene.visualFocus === 'model' ? 'Foto Model' : 'Foto Produk'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-1">{scene.voiceoverScript}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <button
+                id="btn-create-another-video"
+                type="button"
+                onClick={handleResetToForm}
+                className="mt-3 text-xs text-slate-500 hover:text-slate-800 font-semibold underline cursor-pointer"
+              >
+                Buat Konsep Video Lain
+              </button>
             </div>
-          ) : (
-            <div className="w-full h-full min-h-[420px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 text-center text-slate-400">
-              <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-2xs mb-4 text-blue-500">
+          ) : workflowStatus === 'GENERATING_VIDEO' ? (
+            /* 2. REAL PROGRESS TRACKING (TAHAP 4) */
+            <div
+              id="real-video-progress-container"
+              className="w-full bg-white rounded-2xl border border-slate-200 p-8 shadow-xs flex flex-col items-center text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4 animate-pulse">
                 <Video className="w-8 h-8" />
               </div>
-              <h3 className="font-bold text-slate-700 text-base mb-1">
-                Preview Video Iklan Komersial
+              <h3 className="text-base font-bold text-slate-900 mb-1">
+                Sedang Memproses Real AI Video...
               </h3>
-              <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
-                Isi form nama produk dan asset foto di sebelah kiri, lalu klik{' '}
-                <strong>"Generate AI Video Iklan"</strong> untuk melihat hasil visual interaktif.
+              <p className="text-xs text-indigo-600 font-semibold mb-6 flex items-center justify-center gap-2">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                {generationStageText || 'Menghubungkan ke Video Generation Engine...'}
               </p>
+
+              {/* REAL PIPELINE MILESTONES (NO FAKE PERCENTAGE) */}
+              <div className="w-full max-w-sm text-left bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2.5 text-xs">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Naskah & Storyboard 30/60 Detik Disetujui</span>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-700 font-semibold">
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
+                  <span>Google Veo Video Generation (Rendering Clips)</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Clock className="w-4 h-4 shrink-0" />
+                  <span>Penggabungan Klip & Validasi MP4</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 mt-5 leading-relaxed">
+                Pembuatan video fotorealistik membutuhkan waktu 1-3 menit. Jangan tutup tab browser.
+                Sistem anti-double generation aktif.
+              </p>
+            </div>
+          ) : workflowStatus === 'ERROR' ? (
+            /* 3. STRICT ERROR DISPLAY (RULES 12 & 13 - JANGAN FALLBACK KE FOTO!) */
+            <div
+              id="real-video-error-container"
+              className="w-full bg-white rounded-2xl border border-rose-200 p-6 sm:p-7 shadow-xs flex flex-col items-center text-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mb-3">
+                <AlertOctagon className="w-7 h-7" />
+              </div>
+              <h3 className="text-base font-bold text-rose-900 mb-1">
+                AI Video Generation Gagal
+              </h3>
+              <p className="text-xs text-rose-600 font-medium mb-4">
+                Tidak ada video yang berhasil dibuat. Sistem menolak membuat slideshow foto.
+              </p>
+
+              {/* DETAILED ERROR SPECIFICATION (RULE 13) */}
+              <div className="w-full bg-rose-50/70 border border-rose-200 rounded-xl p-4 text-left text-xs space-y-2 mb-4">
+                <div>
+                  <span className="font-bold text-rose-900 block">Tahap Proses:</span>
+                  <span className="text-rose-800">{errorDetails?.stage || 'Video Generation'}</span>
+                </div>
+                <div>
+                  <span className="font-bold text-rose-900 block">Penyebab:</span>
+                  <span className="text-rose-800">{errorDetails?.message}</span>
+                </div>
+                {errorDetails?.details && (
+                  <div>
+                    <span className="font-bold text-rose-900 block">Detail Teknis:</span>
+                    <span className="text-rose-700 font-mono text-[11px] break-words">
+                      {errorDetails.details}
+                    </span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-rose-200/60 text-[11px] text-rose-800">
+                  🛡️ <strong>Jaminan ARVIN STUDIO:</strong> Kesempatan Gratis (1× Trial) Anda tetap{' '}
+                  <strong>UTUH dan BELUM terpakai</strong>.
+                </div>
+              </div>
+
+              {/* COBA LAGI BUTTON */}
+              <button
+                id="btn-retry-video-generation"
+                type="button"
+                onClick={handleResetToForm}
+                className="py-2.5 px-6 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+                [ Coba Lagi ]
+              </button>
+            </div>
+          ) : workflowStatus === 'SCRIPT_READY' && scriptPlan ? (
+            /* 4. STORYBOARD & SCRIPT PLAN DISPLAY (TAHAP 2) */
+            <div
+              id="storyboard-plan-container"
+              className="w-full bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                    Storyboard AI Disetujui
+                  </span>
+                  <h3 className="font-bold text-slate-900 text-base">{scriptPlan.productName}</h3>
+                </div>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">
+                  {scriptPlan.duration}s ({scriptPlan.scenes.length} Adegan)
+                </span>
+              </div>
+
+              {/* Hook & Copywriting Script */}
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 mb-4 text-xs space-y-2">
+                <div>
+                  <span className="font-bold text-slate-700">Hook 3 Detik Pembuka:</span>
+                  <p className="text-blue-700 font-semibold mt-0.5">"{scriptPlan.headlineHook}"</p>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-700">Narasi Copywriting:</span>
+                  <p className="text-slate-600 mt-0.5 italic">{scriptPlan.fullCopywritingScript}</p>
+                </div>
+              </div>
+
+              {/* Scene Breakdown List */}
+              <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                {scriptPlan.scenes.map((scene, idx) => (
+                  <div
+                    key={scene.id || idx}
+                    className="p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all text-xs"
+                  >
+                    <div className="flex items-center justify-between font-bold text-slate-800 mb-1">
+                      <span>
+                        Scene {idx + 1}: {scene.title} ({scene.duration}s)
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">
+                        Fokus: {scene.visualFocus === 'model' ? 'Orang/Model' : 'Produk'}
+                      </span>
+                    </div>
+                    <div className="text-slate-600 space-y-1 mt-1 text-[11px]">
+                      <p>
+                        <strong>Kamera:</strong> {scene.cameraMovement}
+                      </p>
+                      <p>
+                        <strong>Gerakan Manusia:</strong> {scene.humanMotion}
+                      </p>
+                      <p>
+                        <strong>Gerakan Produk:</strong> {scene.productMotion}
+                      </p>
+                      <p className="text-slate-400 font-mono text-[10px] truncate">
+                        <strong>Prompt AI:</strong> {scene.videoPrompt}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Big CTA to Generate Real Video */}
+              <button
+                id="btn-execute-video-from-plan"
+                type="button"
+                onClick={handleGenerateRealVideo}
+                className="mt-5 py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Video className="w-4 h-4" />
+                Lanjutkan Generate REAL AI VIDEO (Google Veo) &rarr;
+              </button>
+            </div>
+          ) : (
+            /* 5. INITIAL WELCOME / EMPTY STATE */
+            <div
+              id="initial-empty-state"
+              className="w-full min-h-[460px] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center p-8 text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-2xs mb-4 text-blue-600">
+                <Film className="w-8 h-8" />
+              </div>
+              <h3 className="font-bold text-slate-800 text-base mb-1">
+                Real AI Video Commercial Studio
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm leading-relaxed mb-4">
+                Sistem menghasilkan video fotorealistik menggunakan AI Video Generation Engine (Veo).
+                Bukan kumpulan foto atau slideshow.
+              </p>
+
+              <div className="w-full max-w-xs bg-white rounded-xl p-3 border border-slate-200 text-left text-xs space-y-2 text-slate-600 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Analisis produk & hook naskah otomatis</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Generate adegan video dinamis bergerak nyata</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Handover langsung ke Studio Edit Video</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1090,3 +1081,5 @@ export const AiVideoAdView: React.FC<AiVideoAdViewProps> = ({
     </div>
   );
 };
+
+export default AiVideoAdView;

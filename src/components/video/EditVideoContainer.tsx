@@ -82,9 +82,10 @@ export const EditVideoContainer: React.FC<EditVideoContainerProps> = ({
     );
   }
 
-  // 2. Jika akun Free / Tidak diizinkan -> Tampilkan Halaman Pengunci Premium
-  // (Video Editor BUKAN di-load, menjaga perangkat tetap ringan)
-  if (!access || !access.allowed) {
+  // 2. Jika akun Free / Tidak diizinkan dan bukan dari AI Video Ad handover -> Tampilkan Halaman Pengunci Premium
+  // (Video Editor BUKAN di-load jika tidak ada akses ataupun video handover)
+  const hasInitialVideo = Boolean(initialVideoUrl && initialVideoUrl.trim());
+  if ((!access || !access.allowed) && !hasInitialVideo) {
     return (
       <VideoPremiumLock
         onUpgrade={() => onNavigate('premium')}

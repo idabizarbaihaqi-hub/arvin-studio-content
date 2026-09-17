@@ -585,8 +585,8 @@ export default function App() {
             currentUser={currentUser}
             onUpgrade={() => setActiveView('premium')}
             onNavigateToEditVideo={(videoPayload) => {
-              if (videoPayload) {
-                const targetUrl = videoPayload.videoUrl || videoPayload.productPhotoUrl || videoPayload.modelPhotoUrl || '';
+              if (videoPayload && videoPayload.videoUrl) {
+                const targetUrl = videoPayload.videoUrl;
                 const targetName = `${videoPayload.productName || 'Iklan'}.mp4`;
                 setPendingVideoForEditor({ url: targetUrl, name: targetName });
               }
